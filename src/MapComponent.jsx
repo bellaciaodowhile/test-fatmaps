@@ -71,7 +71,7 @@ const MapComponent = () => {
         <div className='mb-4'>
           <input
             type='text'
-            placeholder='Search locations...'
+            placeholder='Buscar FAT´s...'
             className='w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
             onChange={(e) => handleSearch(e.target.value)}
           />
@@ -94,7 +94,7 @@ const MapComponent = () => {
         </ul>
         {/* Add Button */}
         <button className='mt-4 w-full bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 transition duration-200'>
-          Add Location
+          Agregar localización
         </button>
       </div>
       {/* Map */}

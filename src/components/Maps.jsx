@@ -82,13 +82,13 @@ const MapComponent = () => {
           {filteredMarkers.map(marker => (
             <li
               key={marker.id}
-              className='cursor-pointer mb-2 p-2 rounded-lg hover:bg-blue-100 transition duration-200 font-semibold'
+              className='cursor-pointer mb-2 p-2 rounded-lg hover:bg-blue-100 transition duration-200 font-semibold flex items-center gap-2'
               onClick={() => {
                 handleSidebarClick(marker);
                 handleMarkerClick(marker);
               }} // Click opens popup
             >
-              {marker.IdFat}
+             <span className={`w-4 h-4 bg-${ marker.usedPorts >= marker.totalPorts ? 'red':'green' }-500 rounded-full inline-block`}></span> {marker.IdFat}
             </li>
           ))}
         </ul>

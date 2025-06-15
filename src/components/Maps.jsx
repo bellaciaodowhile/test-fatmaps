@@ -68,7 +68,7 @@ const MapComponent = () => {
     return uuid;
   }
 
- const handleFileUpload = (event) => {
+const handleFileUpload = (event) => {
   const file = event.target.files[0];
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -84,6 +84,11 @@ const MapComponent = () => {
       const cedulaRiff = row['CEDULA/RIFF'] || ''; // Extraer CEDULA/RIFF
       const telefono = row['TELEFONO'] || ''; // Extraer TELEFONO
 
+      // Extraer el total de puertos del formato "(1:8)"
+      const totalPortsString = row['2ºNivel de SPLlitter'] || '';
+      const totalPortsMatch = totalPortsString.match(/\((\d+):(\d+)\)/);
+      const totalPorts = totalPortsMatch ? parseInt(totalPortsMatch[2], 10) : 0; // Obtener el segundo número
+
       if (existingMarker) {
         // Si el marcador ya existe, suma los puertos ocupados y agrega el nuevo cliente
         existingMarker.usedPorts += row['PUERTOS_OCUPADOS'];
@@ -95,6 +100,7 @@ const MapComponent = () => {
           nombreApellido: nombreApellido,
           cedulaRiff: cedulaRiff,
           telefono: telefono,
+          port: row['PUERTO'],
         });
       } else {
         // Si no existe, crea un nuevo marcador
@@ -104,14 +110,14 @@ const MapComponent = () => {
           lat: lat,
           lng: lng,
           description: row['DESCRIPCION'],
-          totalPorts: row['TOTAL_PUERTOS'],
-          usedPorts: row['PUERTOS_OCUPADOS'],
+          totalPorts: totalPorts, // Asigna el total de puertos extraído
           tipoUsuario: [row['TIPOUSUARIO']],
           clientes: [{
             id: generateUUID(),
             IdFat: row['NOMBRE FAT'],
             description: row['DESCRIPCION'] || undefined,
             tipoUsuario: row['TIPOUSUARIO'],
+            port: row['PUERTO'],
             nombreApellido: nombreApellido,
             cedulaRiff: cedulaRiff,
             telefono: telefono,
@@ -188,22 +194,23 @@ const MapComponent = () => {
             >
               {selectedMarker && selectedMarker.id === marker.id && (
                 <Popup onClose={() => setSelectedMarker(null)}>
-                  <div>
+                  <div className='max-h-[500px] overflow-auto'>
                     <h5 className='font-bold mb-2'>Coordenadas</h5>
                     <span className='font-bold'>LAT: {marker.lat} <br /> LONG: {marker.lng}</span>
                     <h5 className='font-bold mt-2'>Información general:</h5>
                     <ul className='pl-5 list-disc mb-2'>
                       <li className='mt-2'><strong>Nombre FAT:</strong> {marker.IdFat}</li>
                       <li><strong>Puertos:</strong> {marker.totalPorts}</li>
-                      <li><strong>Puertos en uso:</strong> {marker.usedPorts}</li>
+                      <li><strong>Puertos en uso:</strong> {marker.clientes.filter(x => x.nombreApellido != '').length}</li>
                       <li><strong>Estado:</strong> <span className={`text-xs uppercase rounded-full w-3 h-3 inline-flex -mb-[1px] mr-[2px] ${marker.usedPorts >= marker.totalPorts ? 'bg-red-500' : 'bg-green-500'}`}></span><strong>{marker.usedPorts >= marker.totalPorts ? 'Completo' : 'Disponible'}</strong></li>
                     </ul>
                     {/* <p>Clientes: {marker.clientes.map(cliente => cliente.IdFat).join(', ')}</p> */}
                     <h5 className='font-bold'>Clientes:</h5>
                     <ul className=''>
                     {marker.clientes.map(cliente => cliente.nombreApellido && (
-                      <li className='bg-blue-700 p-2 my-2 rounded-lg text-white' key={cliente.id}>
+                      <li className='bg-blue-700 p-2 my-2 rounded-lg text-white relative' key={cliente.id}>
                         {cliente.nombreApellido && <span><strong className='text-blue-200'>Nombre y Apellido:</strong> <br /> {cliente.nombreApellido}</span>}
+                        <span className='absolute top-0 right-0 text-red-800 bg-white p-1 rounded-bl-xl'>{cliente.port}</span>
                         <div className='flex justify-between mt-2'>
                           {cliente.cedulaRiff && <span><strong className='text-blue-200'>Cédula/Riff:</strong> <br /> {cliente.cedulaRiff}</span>}
                           {cliente.telefono && <span><strong className='text-blue-200'>Teléfono:</strong> <br /> {cliente.telefono}</span>}

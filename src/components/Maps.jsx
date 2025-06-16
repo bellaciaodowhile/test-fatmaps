@@ -21,25 +21,15 @@ const center = {
   lng: 150.644
 };
 
-const MapComponent = () => {
-  const [markers, setMarkers] = useState([]);
+const MapComponent = ({ markers }) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredMarkers, setFilteredMarkers] = useState([]);
+  const [filteredMarkers, setFilteredMarkers] = useState(markers || []);
 
+  
   useEffect(() => {
-    // Simulando datos JSON con marcadores
-    const fetchMarkers = async () => {
-      const data = [
-        { id: 1, IdFat: 'FAT3215489', lat: -34.397, lng: 150.644, description: 'Comercial la Gran Chinita', totalPorts: 8, usedPorts: 8, tipoUsuario: ['Usuario1'], clientes: [] },
-        { id: 2, IdFat: 'FAT5189710', lat: -34.407, lng: 150.654, description: 'Comercial la Casa Verde', totalPorts: 16, usedPorts: 4, tipoUsuario: ['Usuario2'], clientes: [] },
-        // Otros datos...
-      ];
-      setMarkers(data);
-      setFilteredMarkers(data); // Inicializa los marcadores filtrados
-    };
-    fetchMarkers();
-  }, []);
+    setFilteredMarkers(markers);
+  }, [markers]);
 
   const handleMarkerClick = (marker) => {
     setSelectedMarker(marker);
@@ -67,74 +57,6 @@ const MapComponent = () => {
     });
     return uuid;
   }
-
-const handleFileUpload = (event) => {
-  const file = event.target.files[0];
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(worksheet);
-    const newMarkers = json.reduce((acc, row) => {
-      const lat = Number(row['LATITUD DEL FAT'].replace(',', '.'));
-      const lng = parseFloat(row['LONGITUD DEL FAT']);
-      const existingMarker = acc.find(marker => marker.lat === lat && marker.lng === lng);
-      const nombreApellido = row['NOMBRE Y APELLIDO'] || ''; // Extraer NOMBRE Y APELLIDO
-      const cedulaRiff = row['CEDULA/RIFF'] || ''; // Extraer CEDULA/RIFF
-      const telefono = row['TELEFONO'] || ''; // Extraer TELEFONO
-
-      // Extraer el total de puertos del formato "(1:8)"
-      const totalPortsString = row['2ºNivel de SPLlitter'] || '';
-      const totalPortsMatch = totalPortsString.match(/\((\d+):(\d+)\)/);
-      const totalPorts = totalPortsMatch ? parseInt(totalPortsMatch[2], 10) : 0; // Obtener el segundo número
-
-      if (existingMarker) {
-        // Si el marcador ya existe, suma los puertos ocupados y agrega el nuevo cliente
-        existingMarker.usedPorts += row['PUERTOS_OCUPADOS'];
-        existingMarker.clientes.push({
-          id: generateUUID(),
-          IdFat: row['NOMBRE FAT'],
-          description: row['DESCRIPCION'] || undefined,
-          tipoUsuario: row['TIPOUSUARIO'],
-          nombreApellido: nombreApellido,
-          cedulaRiff: cedulaRiff,
-          telefono: telefono,
-          port: row['PUERTO'],
-        });
-      } else {
-        // Si no existe, crea un nuevo marcador
-        acc.push({
-          id: generateUUID(), // Genera un nuevo ID único
-          IdFat: row['NOMBRE FAT'],
-          lat: lat,
-          lng: lng,
-          description: row['DESCRIPCION'],
-          totalPorts: totalPorts, // Asigna el total de puertos extraído
-          tipoUsuario: [row['TIPOUSUARIO']],
-          clientes: [{
-            id: generateUUID(),
-            IdFat: row['NOMBRE FAT'],
-            description: row['DESCRIPCION'] || undefined,
-            tipoUsuario: row['TIPOUSUARIO'],
-            port: row['PUERTO'],
-            nombreApellido: nombreApellido,
-            cedulaRiff: cedulaRiff,
-            telefono: telefono,
-          }],
-        });
-      }
-      return acc;
-    }, []);
-    // Actualiza el estado de los marcadores
-    setMarkers(prevMarkers => [...prevMarkers, ...newMarkers]);
-    setFilteredMarkers(prevMarkers => [...prevMarkers, ...newMarkers]);
-    console.log(newMarkers);
-  };
-  reader.readAsArrayBuffer(file);
-};
-
-
   const mapRef = React.useRef();
 
   return (

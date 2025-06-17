@@ -30,6 +30,9 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
   const [editFat, setEditFat] = useState(null);
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
   const [fatToDelete, setFatToDelete] = useState(null);
+  const [importResults, setImportResults] = useState([]);
+  const [showImportResultsModal, setShowImportResultsModal] = useState(false);
+  const fileInputRef = React.useRef(null);
 
   useEffect(() => {
     const fetchFats = async () => {
@@ -52,9 +55,13 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
   }, [setMarkers, setFats]);
 
   const handleFileUpload = (e) => {
+    const file = e.target.files[0];
     const reader = new FileReader();
+    console.log(file)
 
     reader.onload = async (event) => {
+      console.log('Hola')
+      console.log(event)
       const data = new Uint8Array(event.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
@@ -89,6 +96,8 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
         }
 
         if (existingFat && existingFat.length > 0) {
+          console.log(file)
+          e.target.value = ''
           console.log('FAT already exists:', row['NOMBRE FAT']);
           continue; // Skip to the next row
         }
@@ -115,13 +124,18 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
         console.log('Inserted FAT:', insertedFat);
 
         setFats((prevFats) => [...prevFats, newFat]);
+        toast.success('Se ha realizado la importación correctamente.');
         console.log('New FAT added to state:', newFat);
         // setMarkers((prevMarkers) => [...prevMarkers, newFat]);
       }
+      e.target.value = ''
     };
-
+    // reader.abort();
     reader.readAsArrayBuffer(file);
+    console.log(file)
+
     console.log('File reading started');
+        setShowImportResultsModal(true);
   };
 
   const addFat = async (e) => {
@@ -159,11 +173,14 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
     console.log('Inserted FAT:', insertedFat);
     setFats([...fats, fatForm]);
     // setMarkers(prevMarkers => [...prevMarkers, fatForm]);
-    toast.success('FAT agregar dorrectamente.');
-    setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });
-    setOpenModal(false);
-    setEditFat(null);
-  };
+      toast.success('FAT agregar dorrectamente.');
+      setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });
+      setOpenModal(false);
+      setEditFat(null);
+      if (fileInputRef.current) {
+          fileInputRef.current.value = null;
+        }
+    };
 
   const handleEditFat = async (e) => {
     e.preventDefault();
@@ -336,6 +353,30 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
           checkboxSelection
         />
       </div>
+       <Dialog
+        open={showImportResultsModal}
+        onClose={() => setShowImportResultsModal(false)}
+      >
+        <DialogTitle>Resultados de la Importación</DialogTitle>
+        <DialogContent>
+          {importResults.length > 0 ? (
+            <ul>
+              {importResults.map((result, index) => (
+                <li key={index}>
+                  {result.IdFat} - {result.success ? 'Importado' : 'Ya existe'}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No se importaron datos.</p>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowImportResultsModal(false)} color="primary">
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog
         open={deleteConfirmationOpen}
         onClose={() => setDeleteConfirmationOpen(false)}

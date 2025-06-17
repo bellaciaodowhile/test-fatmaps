@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   TextField,
@@ -11,48 +11,149 @@ import {
   InputLabel,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
+import { createClient } from '@supabase/supabase-js';
+import { ToastContainer, toast } from 'react-toastify';
 
-const initialClients = Array.from({ length: 15 }, (_, index) => ({
-  id: `C${index + 1}`,
-  name: `Client ${index + 1}`,
-  userType: index % 2 === 0 ? 'residential' : 'public',
-  address: `Address ${index + 1}`,
-  dni: `DNI${index + 1}`,
-}));
+const SUPABASE_URL = 'https://qmzmznpbpvonegajtavg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtem16bnBicHZvbmVnYWp0YXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMjE5NjMsImV4cCI6MjA2NTU5Nzk2M30.YkJmlrS_55zqdJ-Iu9esXJO56LfJwg-itB6IwGUJnA8';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const Clients = () => {
-  const [clients, setClients] = useState(initialClients);
+  const [clients, setClients] = useState([]);
   const [clientForm, setClientForm] = useState({
     id: '',
     name: '',
     userType: 'residential',
-    address: '',
+    direccion: 'No registrada',
     dni: '',
   });
   const [openModal, setOpenModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  const addClient = (e) => {
-    e.preventDefault();
-    setClients([...clients, clientForm]);
-    setClientForm({ id: '', name: '', userType: 'residential', address: '', dni: '' });
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const fetchClients = async () => {
+  const { data, error } = await supabase.from('clientes').select('*');
+    if (error) {
+      console.error('Error fetching clients:', error);
+    } else {
+      // Reemplazar dirección vacía por "No registrada"
+      const updatedData = data.map(client => ({
+        ...client,
+        direccion: client.direccion || 'No registrada', // Reemplaza dirección vacía
+      }));
+      setClients(updatedData);
+      console.log(updatedData); // Muestra los clientes en la consola
+    }
+  };
+
+  const handleOpenModal = (client) => {
+     if (client) {
+       setClientForm({
+         id: client.id,
+         name: client.nombreApellido, // Asegúrate de que el nombre coincida
+         userType: client.tipoUsuario, // Asegúrate de que el nombre coincida
+         address: client.direccion || 'No registrada',
+         dni: client.cedulaRiff, // Asegúrate de que el nombre coincida
+       });
+       setIsEditing(true);
+     } else {
+       setClientForm({ id: '', name: '', userType: 'residential', address: '', dni: '' });
+       setIsEditing(false);
+     }
+     setOpenModal(true);
+   };
+
+  const handleCloseModal = () => {
     setOpenModal(false);
+  };
+
+ const addOrUpdateClient = async (e) => {
+    e.preventDefault();
+    if (isEditing) {
+        // Update client
+        const { error } = await supabase
+            .from('clientes')
+            .update({
+                nombreApellido: clientForm.name, // Cambia a nombreApellido
+                tipoUsuario: clientForm.userType, // Cambia a tipoUsuario
+                direccion: clientForm.address || 'No registrada',
+                cedulaRiff: clientForm.dni, // Cambia a cedulaRiff
+            })
+            .eq('id', clientForm.id);
+            toast.success('Operación realizada satisfactoriamente.');
+        if (error) {
+            toast.error('Ha ocurrido un error...');
+            console.error('Error updating client:', error);
+        }
+    } else {
+        // Add new client
+        const { error } = await supabase
+            .from('clientes')
+            .insert([{
+                nombreApellido: clientForm.name, // Cambia a nombreApellido
+                tipoUsuario: clientForm.userType, // Cambia a tipoUsuario
+                direccion: clientForm.address || 'No registrada',
+                cedulaRiff: clientForm.dni, // Cambia a cedulaRiff
+            }]);
+            toast.success('Operación realizada satisfactoriamente.');
+        if (error) {
+            toast.error('Ha ocurrido un error...');
+            console.error('Error adding client:', error);
+        }
+    }
+    // Refresh client list
+    fetchClients();
+    handleCloseModal();
+};
+  const handleDeleteClient = async (id) => {
+    const confirmDelete = window.confirm('¿Estás seguro de que deseas eliminar este cliente?');
+    if (confirmDelete) {
+      const { error } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('id', id);
+        toast.success('Operación realizada satisfactoriamente.');
+      if (error) {
+        toast.error('Ha ocurrido un error...');
+        console.error('Error deleting client:', error);
+      } else {
+        fetchClients(); // Refresh the client list after deletion
+      }
+    }
   };
 
   const columns = [
     { field: 'id', headerName: 'ID', width: 90 },
-    { field: 'name', headerName: 'Nombre', width: 150 },
-    { field: 'userType', headerName: 'Tipo de Usuario', width: 150 },
-    { field: 'address', headerName: 'Dirección', width: 200 },
-    { field: 'dni', headerName: 'DNI', width: 150 },
+    { field: 'nombreApellido', headerName: 'Nombre', width: 150 },
+    { field: 'tipoUsuario', headerName: 'Tipo de Usuario', width: 150 },
+    { field: 'direccion', headerName: 'Dirección', width: 200 },
+    { field: 'cedulaRiff', headerName: 'DNI', width: 150 },
+    {
+      field: 'actions',
+      headerName: 'Acciones',
+      width: 150,
+      renderCell: (params) => (
+        <>
+          <Button variant="contained" size="small" color="primary" onClick={() => handleOpenModal(params.row)}>
+            ✎
+          </Button>
+          <Button variant="contained" size="small" color="secondary" onClick={() => handleDeleteClient(params.row.id)}>
+            🗑
+          </Button>
+        </>
+      ),
+    },
   ];
 
   return (
     <Box>
-      <Button variant="contained" color="primary" onClick={() => setOpenModal(true)}>
+      <Button variant="contained" color="primary" onClick={() => handleOpenModal(null)}>
         Agregar Cliente
       </Button>
-
-      <Modal open={openModal} onClose={() => setOpenModal(false)}>
+      <Modal open={openModal} onClose={handleCloseModal}>
         <Box sx={{ 
           width: 400, 
           bgcolor: 'background.paper', 
@@ -63,16 +164,8 @@ const Clients = () => {
           transform: 'translate(-50%, -50%)', 
           boxShadow: 24 
         }}>
-          <Typography variant="h6">Agregar Cliente</Typography>
-          <form onSubmit={addClient}>
-            <TextField
-              label="Client ID"
-              value={clientForm.id}
-              onChange={(e) => setClientForm({ ...clientForm, id: e.target.value })}
-              fullWidth
-              required
-              margin="normal"
-            />
+          <Typography variant="h6">{isEditing ? 'Editar Cliente' : 'Agregar Cliente'}</Typography>
+          <form onSubmit={addOrUpdateClient}>
             <TextField
               label="Nombre"
               value={clientForm.name}
@@ -87,9 +180,10 @@ const Clients = () => {
                 value={clientForm.userType}
                 onChange={(e) => setClientForm({ ...clientForm, userType: e.target.value })}
               >
-                <MenuItem value="residential">Residencial</MenuItem>
-                <MenuItem value="public">Público</MenuItem>
-                <MenuItem value="private">Privado</MenuItem>
+                <MenuItem value="RESIDENCIAL">RESIDENCIAL</MenuItem>
+                <MenuItem value="EMPRESAS">EMPRESAS</MenuItem>
+                <MenuItem value="PÚBLICO">PÚBLICO</MenuItem>
+                <MenuItem value="PRIVADO">PRIVADO</MenuItem>
               </Select>
             </FormControl>
             <TextField
@@ -109,12 +203,11 @@ const Clients = () => {
               margin="normal"
             />
             <Button type="submit" variant="contained" color="primary">
-              Agregar Cliente
+              {isEditing ? 'Actualizar Cliente' : 'Agregar Cliente'}
             </Button>
           </form>
         </Box>
       </Modal>
-
       <Typography variant="h6" sx={{ mt: 4 }}>Lista de Clientes</Typography>
       <div style={{ height: 400, width: '100%', marginTop: '20px' }}>
         <DataGrid

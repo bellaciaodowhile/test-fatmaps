@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Box,
   TextField,
@@ -26,6 +27,7 @@ const Clients = () => {
     userType: 'residential',
     direccion: 'No registrada',
     dni: '',
+    port: ''
   });
   const [openModal, setOpenModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -35,19 +37,43 @@ const Clients = () => {
   }, []);
 
   const fetchClients = async () => {
-  const { data, error } = await supabase.from('clientes').select('*');
-    if (error) {
-      console.error('Error fetching clients:', error);
-    } else {
-      // Reemplazar dirección vacía por "No registrada"
-      const updatedData = data.map(client => ({
-        ...client,
-        direccion: client.direccion || 'No registrada', // Reemplaza dirección vacía
-      }));
-      setClients(updatedData);
-      console.log(updatedData); // Muestra los clientes en la consola
-    }
-  };
+  const { data: clients, error: clientsError } = await supabase.from('clientes').select('*');
+
+  if (clientsError) {
+    console.error('Error fetching clients:', clientsError);
+    return;
+  }
+
+  // Obtener los IDs de los fats de los clientes
+  const fatIds = clients.map(client => client.fat_id).filter(id => id);
+
+  // Realizar una petición para obtener los fats
+  const { data: fats, error: fatsError } = await supabase
+    .from('fats')
+    .select('*')
+    .in('id', fatIds); // Asumiendo que 'id' es el campo que relaciona con 'fat_id'
+
+  if (fatsError) {
+    console.error('Error fetching fats:', fatsError);
+    return;
+  }
+
+  // Crear un objeto de lookup para los fats
+  const fatsLookup = fats.reduce((acc, fat) => {
+    acc[fat.id] = fat; // Asumiendo que 'id' es el campo único en la tabla 'fats'
+    return acc;
+  }, {});
+
+  // Reemplazar dirección vacía por "No registrada" y agregar el objeto fat
+  const updatedData = clients.map(client => ({
+    ...client,
+    direccion: client.direccion || 'No registrada', // Reemplaza dirección vacía
+    fat: fatsLookup[client.fat_id] || null, // Agrega el fat correspondiente
+  }));
+
+  setClients(updatedData);
+  console.log(updatedData); // Muestra los clientes en la consola
+};
 
   const handleOpenModal = (client) => {
      if (client) {
@@ -57,10 +83,11 @@ const Clients = () => {
          userType: client.tipoUsuario, // Asegúrate de que el nombre coincida
          address: client.direccion || 'No registrada',
          dni: client.cedulaRiff, // Asegúrate de que el nombre coincida
+         port: client.port, // Asegúrate de que el nombre coincida
        });
        setIsEditing(true);
      } else {
-       setClientForm({ id: '', name: '', userType: 'residential', address: '', dni: '' });
+       setClientForm({ id: '', name: '', userType: 'residential', address: '', dni: '', port: '' });
        setIsEditing(false);
      }
      setOpenModal(true);
@@ -131,6 +158,20 @@ const Clients = () => {
     { field: 'tipoUsuario', headerName: 'Tipo de Usuario', width: 150 },
     { field: 'direccion', headerName: 'Dirección', width: 200 },
     { field: 'cedulaRiff', headerName: 'DNI', width: 150 },
+    {
+     field: 'fat',
+     headerName: 'FAT',
+     width: 150,
+     renderCell: (params) => (
+       <>
+        <Link 
+          to={`/map/search?lat=${params.row.fat ? params.row.fat.lat : ''}&lng=${params.row.fat ? params.row.fat.lng : ''}`} 
+          className='underline text-blue-500'>
+          {params.row.fat ? params.row.fat.IdFat : 'NO ASIGNADO'}
+        </Link>
+       </>
+     ),
+    },
     {
       field: 'actions',
       headerName: 'Acciones',
@@ -211,6 +252,7 @@ const Clients = () => {
       <Typography variant="h6" sx={{ mt: 4 }}>Lista de Clientes</Typography>
       <div style={{ height: 400, width: '100%', marginTop: '20px' }}>
         <DataGrid
+          showToolbar 
           rows={clients}
           columns={columns}
           pageSize={5}

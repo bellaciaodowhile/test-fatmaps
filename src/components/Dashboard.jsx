@@ -77,7 +77,7 @@ const Dashboard = () => {
       <Box component="main" sx={{ flexGrow: 1, p: showMaps ? 0 : 3 }}>
         {showClients && <Clients />}
         {showFats && <Fats onLocationSelect={setLocation} />}
-        {showMaps && <Maps onLocationSelect={setLocation} />}
+        {showMaps && <Maps onLocationSelect={setLocation}  />}
       </Box>
     </Box>
   );

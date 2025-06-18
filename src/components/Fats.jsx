@@ -24,6 +24,7 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
     description: '',
     totalPorts: 4,
   });
+  const [modal, setModal] = useState('');
   const [openModal, setOpenModal] = useState(false);
   const [excelFile, setExcelFile] = useState(null);
   const [excelData, setExcelData] = useState([]);
@@ -141,53 +142,59 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
   const addFat = async (e) => {
     e.preventDefault();
 
-     // Check if FAT already exists in Supabase
-     const { data: existingFat, error } = await supabase
-     .from('fats')
-     .select('*')
-     .eq('lat', fatForm.lat)
-     .eq('lng', fatForm.lng);
+    // Verificar que fatForm tenga todos los campos necesarios
+    if (!fatForm.lat || !fatForm.lng || !fatForm.description) {
+        toast.error('Por favor, completa todos los campos requeridos.');
+        return;
+    }
 
-   if (error) {
-     console.error('Error checking for existing FAT:', error);
-     return;
-   }
+    // Comprobar si el FAT ya existe en Supabase
+    const { data: existingFat, error } = await supabase
+        .from('fats')
+        .select('*')
+        .eq('lat', fatForm.lat)
+        .eq('lng', fatForm.lng);
 
-   if (existingFat && existingFat.length > 0) {
-    toast.error('Estas coordenadas ya están registradas con un FAT');
-     console.log('FAT already exists:', fatForm.IdFat);
-     return;
-   }
+    if (error) {
+        console.error('Error checking for existing FAT:', error);
+        return;
+    }
 
-    // Insert new FAT into Supabase
+    if (existingFat && existingFat.length > 0) {
+        toast.error('Estas coordenadas ya están registradas con un FAT');
+        console.log('FAT already exists:', fatForm.IdFat);
+        return;
+    }
+
+    // Insertar nuevo FAT en Supabase
     const { data: insertedFat, error: insertError } = await supabase
-      .from('fats')
-      .insert([fatForm]);
+        .from('fats')
+        .insert([fatForm]);
 
     if (insertError) {
-      console.error('Error inserting FAT:', insertError, fatForm);
-      toast.error('Error adding FAT');
-      return;
+        console.error('Error inserting FAT:', insertError, fatForm);
+        toast.error('Error al agregar el FAT');
+        return;
     }
 
     console.log('Inserted FAT:', insertedFat);
     setFats([...fats, fatForm]);
-    // setMarkers(prevMarkers => [...prevMarkers, fatForm]);
-      toast.success('FAT agregar dorrectamente.');
-      setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });
-      setOpenModal(false);
-      setEditFat(null);
-      if (fileInputRef.current) {
-          fileInputRef.current.value = null;
-        }
-    };
+    toast.success('FAT agregado correctamente.');
+    setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });
+    setOpenModal(false);
+    setEditFat(null);
+
+    if (fileInputRef.current) {
+        fileInputRef.current.value = null;
+    }
+  };
 
   const handleEditFat = async (e) => {
     e.preventDefault();
 
 
 
-  console.log('Attempting to update FAT with IdFat:', fatForm.IdFat, 'Data:', fatForm);
+    console.log('Attempting to update FAT with IdFat:', fatForm.IdFat, 'Data:', fatForm);
     const { data, error } = await supabase
       .from('fats')
       .update(fatForm)
@@ -267,17 +274,18 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
   const handleEdit = (fat) => {
     setFatForm(fat);
     setOpenModal(true);
+    setModal('edit');
   };
   return (
     <Box>
-      <Button variant="contained" color="primary" onClick={() => setOpenModal(true)}>
+      <Button variant="contained" color="primary" onClick={() => {setOpenModal(true); setModal('add')}}>
         Agregar FAT
       </Button>
 
-       <Button variant="contained" component="label">
+      {/* <Button variant="contained" component="label">
         Subir archivo Excel
         <input type="file" accept=".xlsx, .xls" hidden onChange={handleFileUpload} />
-      </Button>
+      </Button> */}
 
       <Modal open={openModal} onClose={() => {setOpenModal(false); setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });}}>
         <Box sx={{
@@ -290,8 +298,8 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
           transform: 'translate(-50%, -50%)',
           boxShadow: 24
         }}>
-          <Typography variant="h6">{fatForm.IdFat ? 'Editar FAT' : 'Agregar FAT'}</Typography>
-          <form onSubmit={fatForm.IdFat ? handleEditFat : addFat}>
+          <Typography variant="h6">{modal != 'add' ? 'Editar FAT' : 'Agregar FAT'}</Typography>
+          <form onSubmit={modal != 'add' ? handleEditFat : addFat}>
             <TextField
               label="ID FAT"
               value={fatForm.IdFat}
@@ -337,7 +345,7 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
               </Select>
             </FormControl>
             <Button type="submit" variant="contained" color="primary">
-              {fatForm.IdFat ? 'Guardar Cambios' : 'Agregar FAT'}
+              {modal != 'add' ? 'Guardar Cambios' : 'Agregar FAT'}
             </Button>
           </form>
         </Box>
@@ -345,6 +353,7 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
       <Typography variant="h6" sx={{ mt: 4 }}>Lista de FATs</Typography>
       <div style={{ height: 400, width: '100%', marginTop: '20px' }}>
         <DataGrid
+          showToolbar
           getRowId={(row) => row.IdFat}
           rows={fats}
           columns={columns}

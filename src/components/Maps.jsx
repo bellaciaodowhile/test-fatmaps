@@ -1,10 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import * as XLSX from 'xlsx'; 
 import { createClient } from '@supabase/supabase-js';
 import 'leaflet-control-geocoder';
+import {
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Modal,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+} from '@mui/material';
+import { ToastContainer, toast } from 'react-toastify';
 
 const SUPABASE_URL = 'https://qmzmznpbpvonegajtavg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtem16bnBicHZvbmVnYWp0YXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMjE5NjMsImV4cCI6MjA2NTU5Nzk2M30.YkJmlrS_55zqdJ-Iu9esXJO56LfJwg-itB6IwGUJnA8';
@@ -22,18 +35,53 @@ const createMarkerIcon = (isFull) => {
 };
 
 const center = {
-  lat: -34.397,
-  lng: 150.644
+  lat: 7.872182986252612,
+  lng: -67.4889908730983
 };
-
+const MAP_ZOOM = 20;
 const MapComponent = () => {
+  const [loading, setLoading] = useState(false);
+  const [fatList, setFatList] = useState([]);
   const [isLoading, setIsLoading] = useState(false); 
+  const [isOpenGeocoding, setIsOpenGeocoding] = useState(false); 
   const [markers, setMarkers] = useState([]);
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredMarkers, setFilteredMarkers] = useState([]);
   const [geocodeResults, setGeocodeResults] = useState([]);
+  const [openModal, setOpenModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [clientForm, setClientForm] = useState({
+    id: '',
+    name: '',
+    userType: 'RESIDENCIAL',
+    direccion: 'No registrada',
+    dni: '',
+    fat_id: '',
+    telefono: '',
+  });
   const mapRef = React.useRef();
+
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const lat = query.get('lat');
+  const lng = query.get('lng');
+
+  async function runMap(lat, lng) {
+    try {
+      const mapa = await mapRef; // Espera a que mapRef se resuelva
+
+      if (lat && lng) {
+        console.log(mapa.current);
+        mapa.current.flyTo([parseFloat(lat), parseFloat(lng)], MAP_ZOOM);
+      }
+    } catch (error) {
+      console.error("Error al obtener mapRef:", error);
+    }
+  }
+
+  // Llama a la función con las coordenadas deseadas
+  runMap(lat, lng);
 
   useEffect(() => {
     const fetchMarkers = async () => {
@@ -48,126 +96,166 @@ const MapComponent = () => {
         return;
       }
       const fatsWithClients = fats.map(fat => {
-        const associatedClients = clientes.filter(cliente => cliente.fat_id === fat.id);
+        const associatedClients = clientes.filter(cliente => cliente.fat_id == fat.id);
         return {
           ...fat,
           clientes: associatedClients,
         };
       });
+      console.log(fatsWithClients)
       setMarkers(fatsWithClients);
       setFilteredMarkers(fatsWithClients);
     };
     fetchMarkers();
   }, []);
 
-  const handleFileUpload = async (event) => {
+   const handleFileUpload = async (event) => {
+    setLoading(true); // Muestra el preloader
     const file = event.target.files[0];
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(worksheet);
-      const newMarkers = [];
-      const clientesMap = {}; // Mapa para almacenar clientes por fat_id
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(worksheet);
+        const newMarkers = [];
+        const clientesMap = {};
+        for (const row of json) {
+            const lat = Number(row['LATITUD DEL FAT'].replace(',', '.'));
+            const lng = parseFloat(row['LONGITUD DEL FAT']);
+            const totalPortsString = row['2ºNivel de SPLlitter'] || '';
+            const totalPortsMatch = totalPortsString.match(/\((\d+):(\d+)\)/);
+            const totalPorts = totalPortsMatch ? parseInt(totalPortsMatch[2], 10) : 0;
+            const { data: existingFats, error: fetchError } = await supabase
+                .from('fats')
+                .select('*')
+                .eq('lat', lat)
+                .eq('lng', lng);
+            if (fetchError) {
+                console.error('Error al verificar FAT existente:', fetchError);
+                continue;
+            }
+            let fatId;
+            if (existingFats.length === 0) {
+                const { data: fatData, error } = await supabase
+                    .from('fats')
+                    .insert([{
+                        IdFat: row['NOMBRE FAT'],
+                        lat: lat,
+                        lng: lng,
+                        description: row['DESCRIPCION'],
+                        totalPorts: totalPorts,
+                    }]);
+                if (error) {
+                    console.error('Error al insertar FAT en Supabase:', error);
+                } else if (fatData && fatData.length > 0) {
+                    fatId = fatData[0].id;
+                    newMarkers.push({
+                        id: fatId,
+                        IdFat: row['NOMBRE FAT'],
+                        lat: lat,
+                        lng: lng,
+                        description: row['DESCRIPCION'],
+                        totalPorts: totalPorts,
+                        clientes: []
+                    });
+                }
+            } else {
+                fatId = existingFats[0].id;
+                console.log(`El FAT con coordenadas (${lat}, ${lng}) ya existe.`);
+            }
+            const nombreCliente = row['NOMBRE Y APELLIDO'];
+            const tipoUsuario = row['TIPOUSUARIO'];
+            if (nombreCliente) {
+                // Verificar si el cliente ya existe usando cedulaRiff
+                const cedulaRiff = row['CEDULA/RIFF'];
+                const { data: existingClientes, error: clienteFetchError } = await supabase
+                    .from('clientes')
+                    .select('*')
+                    .eq('cedulaRiff', cedulaRiff);
+                
+                if (clienteFetchError) {
+                    console.error('Error al verificar cliente existente:', clienteFetchError);
+                    continue;
+                }
 
-      for (const row of json) {
-        const lat = Number(row['LATITUD DEL FAT'].replace(',', '.'));
-        const lng = parseFloat(row['LONGITUD DEL FAT']);
-        const totalPortsString = row['2ºNivel de SPLlitter'] || '';
-        const totalPortsMatch = totalPortsString.match(/\((\d+):(\d+)\)/);
-        const totalPorts = totalPortsMatch ? parseInt(totalPortsMatch[2], 10) : 0;
-
-        // Verifica si el FAT ya existe en Supabase
-        const { data: existingFats, error: fetchError } = await supabase
-          .from('fats')
-          .select('*')
-          .eq('lat', lat)
-          .eq('lng', lng);
-
-        if (fetchError) {
-          console.error('Error al verificar FAT existente:', fetchError);
-          continue; // Salta a la siguiente fila si hay un error
+                // Solo insertar si el cliente no existe
+                if (existingClientes.length === 0) {
+                    const cliente = {
+                        nombreApellido: nombreCliente,
+                        cedulaRiff: cedulaRiff,
+                        telefono: row['TELEFONO'],
+                        tipoUsuario: tipoUsuario,
+                        fat_id: fatId,
+                        port: row['PUERTO'],
+                    };
+                    const { error: clienteError } = await supabase
+                        .from('clientes')
+                        .insert([cliente]);
+                    if (clienteError) {
+                        console.error('Error al insertar cliente en Supabase:', clienteError);
+                    } else {
+                        if (!clientesMap[fatId]) {
+                            clientesMap[fatId] = [];
+                        }
+                        clientesMap[fatId].push(cliente);
+                    }
+                } else {
+                    console.log(`El cliente con cedulaRiff ${cedulaRiff} ya existe.`);
+                }
+            }
         }
-
-        let fatId;
-        if (existingFats.length === 0) {
-          // Inserta el FAT en Supabase
-          const { data: fatData, error } = await supabase
-            .from('fats')
-            .insert([{
-              IdFat: row['NOMBRE FAT'],
-              lat: lat,
-              lng: lng,
-              description: row['DESCRIPCION'],
-              totalPorts: totalPorts,
-            }]);
-
-          if (error) {
-            console.error('Error al insertar FAT en Supabase:', error);
-            continue; // Salta a la siguiente fila si hay un error
-          }
-
-          if (fatData && fatData.length > 0) {
-            fatId = fatData[0].id; // Obtiene el ID del nuevo registro
-            newMarkers.push({
-              id: fatId,
-              IdFat: row['NOMBRE FAT'],
-              lat: lat,
-              lng: lng,
-              description: row['DESCRIPCION'],
-              totalPorts: totalPorts,
-              clientes: [] // Inicializa la lista de clientes
+        newMarkers.forEach(marker => {
+            if (clientesMap[marker.id]) {
+                marker.clientes = clientesMap[marker.id];
+            }
+        });
+        const fetchMarkers = async () => {
+            const { data: fats, error: fatsError } = await supabase.from('fats').select('*');
+            if (fatsError) {
+                console.error('Error fetching FATs:', fatsError);
+                return;
+            }
+            const { data: clientes, error: clientesError } = await supabase.from('clientes').select('*');
+            if (clientesError) {
+                console.error('Error fetching Clientes:', clientesError);
+                return;
+            }
+            const fatsWithClients = fats.map(fat => {
+                const associatedClients = clientes.filter(cliente => cliente.fat_id == fat.id);
+                return {
+                    ...fat,
+                    clientes: associatedClients,
+                };
             });
-          }
-        } else {
-          fatId = existingFats[0].id; // Si existe, usa el ID existente
-          console.log(`El FAT con coordenadas (${lat}, ${lng}) ya existe.`);
-        }
-
-        // Ahora inserta los clientes asociados a este FAT
-        const nombreCliente = row['NOMBRE Y APELLIDO'];
-        const tipoUsuario = row['TIPOUSUARIO']; // Obtiene el tipo de usuario del cliente
-        if (nombreCliente) { // Solo insertar si el nombre y apellido no está vacío
-          const cliente = {
-            id: generateUUID(), // Genera un ID único para el cliente
-            nombreApellido: nombreCliente,
-            cedulaRiff: row['CEDULA/RIFF'],
-            telefono: row['TELEFONO'],
-            tipoUsuario: tipoUsuario, // Incluye el tipo de usuario
-            fat_id: fatId // Relación con el FAT
-          };
-
-          // Agrega el cliente al mapa de clientes por fat_id
-          if (!clientesMap[fatId]) {
-            clientesMap[fatId] = [];
-          }
-          clientesMap[fatId].push(cliente);
-        }
-      }
-
-      // Asocia los clientes a los FATs
-      newMarkers.forEach(marker => {
-        if (clientesMap[marker.id]) {
-          marker.clientes = clientesMap[marker.id];
-        }
-      });
-
-      // Actualiza el estado de los marcadores
-      setMarkers(prevMarkers => [...prevMarkers, ...newMarkers]);
-      setFilteredMarkers(prevMarkers => [...prevMarkers, ...newMarkers]);
+            console.log(fatsWithClients);
+            setMarkers(fatsWithClients);
+            setFilteredMarkers(fatsWithClients);
+        };
+        await fetchMarkers();
+        setMarkers(prevMarkers => [...prevMarkers, ...newMarkers]);
+        setFilteredMarkers(prevMarkers => [...prevMarkers, ...newMarkers]);
+        setLoading(false); // Oculta el preloader después de cargar los datos
     };
-
     reader.readAsArrayBuffer(file);
-  };
+};
 
   const handleMarkerClick = (marker) => {
     setSelectedMarker(marker);
   };
 
   const handleSidebarClick = (marker) => {
-    setSelectedMarker(marker);
-    mapRef.current.flyTo([parseFloat(marker.lat), parseFloat(marker.lng)], 14);
+    const lat = parseFloat(marker.lat);
+    const lng = parseFloat(marker.lng);
+
+    // Verifica que lat y lng sean números válidos
+    if (!isNaN(lat) && !isNaN(lng)) {
+        setSelectedMarker(marker);
+        mapRef.current.flyTo([lat, lng], MAP_ZOOM);
+    } else {
+        console.error('Latitud o longitud inválida:', marker.lat, marker.lng);
+        alert('Este FAT no tiene coordenadas registradas.')
+    }
   };
 
  const handleSearch = (term) => {
@@ -175,8 +263,7 @@ const MapComponent = () => {
     const filtered = markers.filter(marker => {
       const matchesFat = marker.IdFat.toLowerCase().includes(term.toLowerCase());
       const matchesClient = marker.clientes && marker.clientes.some(cliente => 
-        cliente.nombreApellido.toLowerCase().includes(term.toLowerCase()) || 
-        cliente.cedulaRiff.toLowerCase().includes(term.toLowerCase())
+        cliente.nombreApellido.toLowerCase().includes(term.toLowerCase())
       );
       return matchesFat || matchesClient;
     });
@@ -223,7 +310,7 @@ const MapComponent = () => {
 
           // Opcional: Si deseas centrar el mapa en el primer resultado
           const { lat, lon } = results[0];
-          mapRef.current.flyTo([lat, lon], 14);
+          mapRef.current.flyTo([lat, lon], MAP_ZOOM);
         } else {
           // alert('No se encontró la dirección. Por favor, intenta con otro formato.');
         }
@@ -246,10 +333,228 @@ const MapComponent = () => {
     return uuid;
   };
 
+  const findNearestFAT = (lat, lng) => {
+  let nearestFAT = null;
+  let shortestDistance = Infinity;
+
+  markers.forEach(fat => {
+    const fatLat = parseFloat(fat.lat); // Asegúrate de que la propiedad de latitud sea correcta
+    const fatLng = parseFloat(fat.lng); // Asegúrate de que la propiedad de longitud sea correcta
+
+    // Calcular la distancia utilizando la fórmula de Haversine
+    const distance = Math.sqrt(Math.pow(fatLat - lat, 2) + Math.pow(fatLng - lng, 2));
+
+    if (distance < shortestDistance) {
+      shortestDistance = distance;
+      nearestFAT = fat;
+    }
+  });
+
+  return nearestFAT;
+};
+
+function haversineDistance(coords1, coords2) {
+  console.log({
+    type: 'test',
+    data: {
+      coords1,
+      coords2
+    }
+  })
+    const toRad = (value) => (Math.PI / 180) * value;
+
+    const R = 6371; // Radio de la Tierra en kilómetros
+    const dLat = toRad(coords2.latitude - coords1.latitude);
+    const dLon = toRad(coords2.longitude - coords1.longitude);
+
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(toRad(coords1.latitude)) * Math.cos(toRad(coords2.latitude)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distancia en kilómetros
+}
+
+ const handleOpenModal = (client) => {
+     if (client) {
+       setClientForm({
+         id: client.id,
+         name: client.nombreApellido, // Asegúrate de que el nombre coincida
+         userType: client.tipoUsuario, // Asegúrate de que el nombre coincida
+         address: client.direccion || 'No registrada',
+         dni: client.cedulaRiff, // Asegúrate de que el nombre coincida
+       });
+       setIsEditing(true);
+     } else {
+       setClientForm({ id: '', name: '', userType: '', address: '', dni: '' });
+       setIsEditing(false);
+     }
+     setOpenModal(true);
+   };
+
+  const handleCloseModal = () => {
+    setOpenModal(false);
+  };
+   const addOrUpdateClient = async (e) => {
+      e.preventDefault();
+      if (isEditing) {
+          // Update client
+          const { error } = await supabase
+              .from('clientes')
+              .update({
+                  nombreApellido: clientForm.name, // Cambia a nombreApellido
+                  tipoUsuario: clientForm.userType, // Cambia a tipoUsuario
+                  direccion: clientForm.address || 'No registrada',
+                  cedulaRiff: clientForm.dni, // Cambia a cedulaRiff
+              })
+              .eq('id', clientForm.id);
+              toast.success('Operación realizada satisfactoriamente.');
+          if (error) {
+              toast.error('Ha ocurrido un error...');
+              console.error('Error updating client:', error);
+          }
+      } else {
+          // Add new client
+          const { error } = await supabase
+              .from('clientes')
+              .insert([{
+                  nombreApellido: clientForm.name, // Cambia a nombreApellido
+                  tipoUsuario: clientForm.userType, // Cambia a tipoUsuario
+                  direccion: clientForm.address || 'No registrada',
+                  cedulaRiff: clientForm.dni, // Cambia a cedulaRiff
+                  fat_id: clientForm.fat_id, // Cambia a cedulaRiff
+                  telefono: clientForm.telefono, // Cambia a cedulaRiff
+              }]);
+              toast.success('Operación realizada satisfactoriamente.');
+
+              const fetchMarkers = async () => {
+                const { data: fats, error: fatsError } = await supabase.from('fats').select('*');
+                if (fatsError) {
+                  console.error('Error fetching FATs:', fatsError);
+                  return;
+                }
+                const { data: clientes, error: clientesError } = await supabase.from('clientes').select('*');
+                if (clientesError) {
+                  console.error('Error fetching Clientes:', clientesError);
+                  return;
+                }
+                const fatsWithClients = fats.map(fat => {
+                  const associatedClients = clientes.filter(cliente => cliente.fat_id == fat.id);
+                  return {
+                    ...fat,
+                    clientes: associatedClients,
+                  };
+                });
+                console.log(fatsWithClients)
+                setMarkers(fatsWithClients);
+                setFilteredMarkers(fatsWithClients);
+              };
+              fetchMarkers();
+
+
+
+
+
+          if (error) {
+              toast.error('Ha ocurrido un error...');
+              console.error('Error adding client:', error);
+          }
+      }
+      // Refresh client list
+      handleCloseModal();
+  };
+
+
   return (
     <div className='flex'>
       <div className='w-1/4 bg-white shadow-2xl p-4 h-screen overflow-y-auto'>
-        <h2 className='text-lg font-bold mb-4'>Locations</h2>
+        <h2 className='text-lg font-bold mb-4'>FATS</h2>
+        <Button variant="contained" className='w-full font-bold' color="primary" onClick={() => handleOpenModal(null)}>
+          Agregar Cliente
+        </Button>
+        <Modal open={openModal} onClose={handleCloseModal}>
+          <Box sx={{ 
+            width: 400, 
+            bgcolor: 'background.paper', 
+            p: 4, 
+            position: 'absolute', 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)', 
+            boxShadow: 24 
+          }}>
+            <Typography variant="h6">{isEditing ? 'Editar Cliente' : 'Agregar Cliente'}</Typography>
+            <form onSubmit={addOrUpdateClient}>
+              <TextField
+                label="Nombre"
+                value={clientForm.name}
+                onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })}
+                fullWidth
+                required
+                margin="normal"
+              />
+              <FormControl fullWidth required margin="normal">
+                <InputLabel>Tipo de Usuario</InputLabel>
+                <Select
+                  required
+                  value={clientForm.userType}
+                  onChange={(e) => setClientForm({ ...clientForm, userType: e.target.value })}
+                >
+                  <MenuItem value="RESIDENCIAL">RESIDENCIAL</MenuItem>
+                  <MenuItem value="EMPRESAS">EMPRESAS</MenuItem>
+                  <MenuItem value="PÚBLICO">PÚBLICO</MenuItem>
+                  <MenuItem value="PRIVADO">PRIVADO</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl fullWidth required margin="normal">
+                <InputLabel>Fats</InputLabel>
+                <Select
+                  required
+                  value={clientForm.fat_id} // Asegúrate de que `fat` esté en el estado de `clientForm`
+                  onChange={(e) => setClientForm({ ...clientForm, fat_id: e.target.value })}
+                >
+                  {markers?.map((fat) => {
+                    if (fat?.clientes?.length < fat.totalPorts) {
+                      return (
+                        <MenuItem key={fat.id} value={fat.id}>
+                          {fat.IdFat}
+                        </MenuItem>
+                      );
+                    }
+                    return null;
+                  })}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Dirección"
+                value={clientForm.address}
+                onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
+                fullWidth
+                required
+                margin="normal"
+              />
+              <TextField
+                label="Teléfono"
+                value={clientForm.telefono}
+                onChange={(e) => setClientForm({ ...clientForm, telefono: e.target.value })}
+                fullWidth
+                required
+                margin="normal"
+              />
+              <TextField
+                label="DNI"
+                value={clientForm.dni}
+                onChange={(e) => setClientForm({ ...clientForm, dni: e.target.value })}
+                fullWidth
+                required
+                margin="normal"
+              />
+              <Button type="submit" variant="contained" color="primary">
+                {isEditing ? 'Actualizar Cliente' : 'Agregar Cliente'}
+              </Button>
+            </form>
+          </Box>
+        </Modal>
         <div className='mb-4'>
           <input
             type='file'
@@ -258,9 +563,13 @@ const MapComponent = () => {
             className='hidden'
             id='file-upload'
           />
-          <label htmlFor='file-upload' className='w-full p-2 text-center bg-blue-500 text-white font-bold uppercase rounded-lg cursor-pointer hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 inline-block'>
+          <label htmlFor='file-upload' className='w-full p-2 mt-4 text-center bg-blue-500 text-white font-bold uppercase rounded cursor-pointer hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 inline-block text-md'>
             Importar Excel
           </label>
+          {loading && 
+          <div className="preloader">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle fill="#1E17FF" stroke="#1E17FF" stroke-width="12" r="15" cx="40" cy="100"><animate attributeName="opacity" calcMode="spline" dur="2" values="1;0;1;" keySplines=".5 0 .5 1;.5 0 .5 1" repeatCount="indefinite" begin="-.4"></animate></circle><circle fill="#1E17FF" stroke="#1E17FF" stroke-width="12" r="15" cx="100" cy="100"><animate attributeName="opacity" calcMode="spline" dur="2" values="1;0;1;" keySplines=".5 0 .5 1;.5 0 .5 1" repeatCount="indefinite" begin="-.2"></animate></circle><circle fill="#1E17FF" stroke="#1E17FF" stroke-width="12" r="15" cx="160" cy="100"><animate attributeName="opacity" calcMode="spline" dur="2" values="1;0;1;" keySplines=".5 0 .5 1;.5 0 .5 1" repeatCount="indefinite" begin="0"></animate></circle></svg>
+          </div>}
           <h4 className='uppercase text-xs my-1 font-bold text-gray-500'>importarás fats con sus respectivos clientes.</h4>
         </div>
         <div className='mb-4'>
@@ -281,13 +590,13 @@ const MapComponent = () => {
                 handleMarkerClick(marker);
               }}
             >
-              <span className={`w-[10px] h-[10px] bg-${marker.usedPorts >= marker.totalPorts ? 'red' : 'green'}-500 rounded-full inline-block`}></span> {marker.IdFat}             
+              <span className={`w-[10px] h-[10px] bg-${marker?.clientes?.length >= marker.totalPorts ? 'red' : 'green'}-500 rounded-full inline-block`}></span> {marker.IdFat}             
             </li>
           ))}
         </ul>
       </div>
       <div className='relative w-3/4'>
-        <MapContainer center={center} zoom={10} style={{ height: '100vh', width: '100%' }} ref={mapRef}>
+        <MapContainer center={center} zoom={18} style={{ height: '100vh', width: '100%' }} ref={mapRef}>
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution=''
@@ -296,7 +605,7 @@ const MapComponent = () => {
             <Marker
               key={marker.id}
               position={{ lat: marker.lat, lng: marker.lng }}
-              icon={createMarkerIcon(marker.usedPorts >= marker.totalPorts)}
+              icon={createMarkerIcon(marker?.clientes?.length >= marker.totalPorts)}
               eventHandlers={{
                 click: () => handleMarkerClick(marker),
               }}
@@ -307,17 +616,18 @@ const MapComponent = () => {
                     <h5 className='font-bold mb-2'>Coordenadas</h5>
                     <span className='font-bold'>LAT: {marker.lat} <br /> LONG: {marker.lng}</span>
                     <h5 className='font-bold mt-2'>Información general:</h5>
-                    <ul className='pl-5 list-disc mb-2'>
+                    <ul className='pl-5 list-disc mb-2 min-w-[281px]'>
                       <li className='mt-2'><strong>Nombre FAT:</strong> {marker.IdFat}</li>
                       <li><strong>Puertos:</strong> {marker.totalPorts}</li>
                       <li><strong>Puertos en uso:</strong> {marker?.clientes?.length > 0 ? marker?.clientes?.length : 0}</li>
-                      <li><strong>Estado:</strong> <span className={`text-xs uppercase rounded-full w-3 h-3 inline-flex -mb-[1px] mr-[2px] ${marker.usedPorts >= marker.totalPorts ? 'bg-red-500' : 'bg-green-500'}`}></span><strong>{marker.usedPorts >= marker.totalPorts ? 'Completo' : 'Disponible'}</strong></li>
+                      <li><strong>Estado:</strong> <span className={`text-xs uppercase rounded-full w-3 h-3 inline-flex -mb-[1px] mr-[2px] ${marker?.clientes?.length >= marker.totalPorts ? 'bg-red-500' : 'bg-green-500'}`}></span><strong>{marker?.clientes?.length >= marker.totalPorts ? 'Completo' : 'Disponible'}</strong></li>
                     </ul>
                     <h5 className='font-bold'>Clientes:</h5>
                     <ul className=''>
                       {marker?.clientes?.length > 0 ? (
                         marker.clientes.map(cliente => (
                           <li className='bg-blue-700 p-2 my-2 rounded-lg text-white relative' key={cliente.id}>
+                            {/* <span className='absolute p-2 bg-white rounded-bl-lg top-0 right-0 text-red-500 font-bold'>{cliente.port}</span> */}
                             {cliente.nombreApellido && <span><strong className='text-blue-200'>Nombre y Apellido:</strong> <br /> {cliente.nombreApellido}</span>}
                             <div className='flex justify-between mt-2'>
                               {cliente.cedulaRiff && <span><strong className='text-blue-200'>Cédula/Riff:</strong> <br /> {cliente.cedulaRiff}</span>}
@@ -336,8 +646,109 @@ const MapComponent = () => {
           ))}
         </MapContainer>
         {/* Lista flotante de resultados de geocodificación */}
-         <div className='absolute right-0 top-0 bg-white shadow-lg p-4 h-screen overflow-y-auto w-1/4 z-[999999999]'>
+       <div className={`absolute top-0 ${isOpenGeocoding ? 'right-0' : '-right-[300px]'} h-screen w-[300px] z-[999999999] transition-all`}>
+         <span 
+         className='absolute bg-white -left-[65px] p-2 rounded-l-lg top-3 cursor-pointer hover:pr-5 hover:-left-[80px] transition-all shadow-2xl' 
+         onClick={()=> {setIsOpenGeocoding(!isOpenGeocoding)}}
+         >
+            <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="50" height="50" viewBox="0 0 30 30">
+            <path d="M 13 3 C 7.4889971 3 3 7.4889971 3 13 C 3 18.511003 7.4889971 23 13 23 C 15.396508 23 17.597385 22.148986 19.322266 20.736328 L 25.292969 26.707031 A 1.0001 1.0001 0 1 0 26.707031 25.292969 L 20.736328 19.322266 C 22.148986 17.597385 23 15.396508 23 13 C 23 7.4889971 18.511003 3 13 3 z M 13 5 C 17.430123 5 21 8.5698774 21 13 C 21 17.430123 17.430123 21 13 21 C 8.5698774 21 5 17.430123 5 13 C 5 8.5698774 8.5698774 5 13 5 z"></path>
+            </svg>
+        </span>
+        <div className='absolute right-0 top-0 bg-white shadow-2xl p-4 h-screen overflow-y-auto w-full z-[999999999]'>
           <h3 className='text-lg font-bold mb-4'>Resultados de Geocodificación</h3>
+          <h3 className='text-lg font-bold mb-4'>Búsqueda por coordenadas</h3>
+          {/* Apartado para ingresar latitud y longitud */}
+          <div className='mb-4'>
+            <input
+              type='text'
+              placeholder='Latitud'
+              className='w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2'
+              id='latitudeInput'
+            />
+            <input
+              type='text'
+              placeholder='Longitud'
+              className='w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2'
+              id='longitudeInput'
+            />
+            <input
+                type='text'
+                placeholder='Radio en metros. Ej: 1000, 1300, 500...'
+                className='w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2'
+                id='radiusInput'
+            />
+            <button
+                className='mt-2 w-full p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600'
+                onClick={() => {
+                    const radiusInMeters = parseInt(document.getElementById('radiusInput').value) || 1000; // Valor por defecto de 1000 metros
+                    const lat = parseFloat(document.getElementById('latitudeInput').value);
+                    const lng = parseFloat(document.getElementById('longitudeInput').value);
+                   if (!isNaN(lat) && !isNaN(lng)) {
+                      // Limpiar el mapa de marcadores y círculos anteriores
+                      mapRef.current.eachLayer((layer) => {
+                          if (layer instanceof L.Circle) {
+                              mapRef.current.removeLayer(layer);
+                          }
+                      });
+                      fatList.map((fat) => {
+                      //  mapRef.current.removeLayer(fat.marker);
+                      });
+                    // Marcar la ubicación actual en el mapa
+
+
+                      // Marcar la ubicación actual en el mapa
+                      L.marker([lat, lng]).addTo(mapRef.current);
+                      mapRef.current.flyTo([lat, lng], MAP_ZOOM);
+                      
+                      // Crear una lista para almacenar los FATS y sus distancias
+                      const newFatList = [];
+                      
+                      // Obtener el radio en metros
+                      const radiusInMeters = parseInt(document.getElementById('radiusInput').value) || 1000;
+
+                      // Recorrer todos los FATS
+                      filteredMarkers.forEach(nearestFAT => {
+                          const distance = haversineDistance({ latitude: lat, longitude: lng }, { latitude: nearestFAT.lat, longitude: nearestFAT.lng });
+                          
+                          // Solo agregar FATS que estén dentro del radio especificado
+                          if (distance <= radiusInMeters) {
+                              newFatList.push({ id: nearestFAT.id, name: nearestFAT.IdFat, distance: distance, lat: nearestFAT.lat, lng: nearestFAT.lng });
+                          }
+                      });
+
+                      // Círculo para el punto de búsqueda
+                      L.circle([lat, lng], {
+                          color: 'blue', // Color del círculo
+                          radius: radiusInMeters
+                      }).addTo(mapRef.current);
+                      
+                      // Actualizar el estado con la nueva lista de FATS
+                      setFatList(newFatList);
+                  } else {
+                      alert('Por favor, ingrese valores válidos para latitud y longitud.');
+                  }
+                }}
+            >
+                Ir a Ubicación
+            </button>
+          </div>
+          {/* Renderizar la lista de FATS */}
+          <ul className='mt-4'>
+            {console.log(fatList)}
+              {fatList.map(fat => (
+                  <li
+                  className='cursor-pointer mb-2 p-2 rounded-lg hover:bg-blue-100 transition duration-200 font-semibold flex items-center gap-2'
+                  onClick={() => {
+                    handleSidebarClick(fat);
+                    handleMarkerClick(fat);
+                  }} 
+                  key={fat.id}>
+                      FAT: {fat.name} <br /> Distancia: {fat.distance.toFixed(2)} km
+                  </li>
+              ))}
+          </ul>
+          {/* <h3 className='text-lg font-bold mb-4'>Búsqueda por dirección</h3>
           <div className='mb-4'>
             <input
               type='text'
@@ -349,7 +760,8 @@ const MapComponent = () => {
                 }
               }}
             />
-          </div>
+          </div> */}
+
           {isLoading ? ( // Mostrar preloader si está cargando
             <div className='flex justify-center items-center'>
               <div className='loader'>Espere un momento...</div> {/* Aquí puedes usar un spinner o un texto de carga */}
@@ -361,7 +773,7 @@ const MapComponent = () => {
                   key={result.id}
                   className='cursor-pointer mb-2 p-2 rounded-lg hover:bg-blue-100 transition duration-200 font-semibold flex items-center gap-2'
                   onClick={() => {
-                    mapRef.current.flyTo([result.lat, result.lng], 14);
+                    mapRef.current.flyTo([result.lat, result.lng], MAP_ZOOM);
                     setSelectedMarker(result);
                   }}
                 >
@@ -371,6 +783,7 @@ const MapComponent = () => {
             </ul>
           )}
         </div>
+       </div>
       </div>
     </div>
   );

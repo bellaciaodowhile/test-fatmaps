@@ -18,7 +18,7 @@ const Login = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (username === 'admin' && password === 'contrasena') {
-      navigate('/dashboard'); // Redirect to the dashboard
+      navigate('/map'); // Redirect to the dashboard
     } else {
       setError('Credenciales incorrectas');
       setOpen(true);

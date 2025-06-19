@@ -79,9 +79,7 @@ const MapComponent = () => {
   const query = new URLSearchParams(location.search);
   const lat = query.get('lat');
   const lng = query.get('lng');
-
   let currentCircle = null; // Variable para almacenar el círculo actual
-
   async function runMap(lat, lng) {
       try {
           const mapa = await mapRef; // Espera a que mapRef se resuelva
@@ -311,18 +309,38 @@ const MapComponent = () => {
     setSelectedMarker(marker);
   };
 
-  const handleSidebarClick = (marker) => {
-    const lat = parseFloat(marker.lat);
-    const lng = parseFloat(marker.lng);
 
-    // Verifica que lat y lng sean números válidos
-    if (!isNaN(lat) && !isNaN(lng)) {
-        setSelectedMarker(marker);
-        mapRef.current.flyTo([lat, lng], MAP_ZOOM);
-    } else {
-        console.error('Latitud o longitud inválida:', marker.lat, marker.lng);
-        alert('Este FAT no tiene coordenadas registradas.')
-    }
+
+  const handleSidebarClick = (marker) => {
+      const lat = parseFloat(marker.lat);
+      const lng = parseFloat(marker.lng);
+      
+      // Verifica que lat y lng sean números válidos
+      if (!isNaN(lat) && !isNaN(lng)) {
+          // Reinicia el círculo anterior si existe
+          markers.map(fat => {
+            mapRef.current.eachLayer(layer => {
+              if (layer instanceof L.Circle) {
+                mapRef.current.removeLayer(layer);
+              }
+            });
+          })
+          if (currentCircle) {
+              currentCircle.remove(); // Elimina el círculo anterior
+          }
+
+          setSelectedMarker(marker);
+          mapRef.current.flyTo([lat, lng], MAP_ZOOM);
+
+          // Crear un nuevo círculo de 10 metros de radio
+          currentCircle = L.circle([lat, lng], {
+              color: 'blue',
+              radius: 10 // Radio en metros
+          }).addTo(mapRef.current); // Añadir el círculo al mapa
+      } else {
+          console.error('Latitud o longitud inválida:', marker.lat, marker.lng);
+          alert('Este FAT no tiene coordenadas registradas.');
+      }
   };
 
  const handleSearch = (term) => {
@@ -517,7 +535,6 @@ function haversineDistance(coords1, coords2) {
                 setFilteredMarkers(fatsWithClients);
               };
               fetchMarkers();
-
 
 
 

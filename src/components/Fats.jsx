@@ -10,10 +10,16 @@ const SUPABASE_URL = 'https://qmzmznpbpvonegajtavg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtem16bnBicHZvbmVnYWp0YXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMjE5NjMsImV4cCI6MjA2NTU5Nzk2M30.YkJmlrS_55zqdJ-Iu9esXJO56LfJwg-itB6IwGUJnA8';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const generateUUID = () => {
+    var d = new Date().getTime();
+    var uuid = 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = (d + Math.random() * 16) % 16 | 0;
+      d = Math.floor(d / 16);
+      return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+    return uuid;
+  };
 
-const generateUniqueId = () => {
-  return `FAT${Math.floor(100000 + Math.random() * 900000)}`;
-};
 
 const Fats = ({ onLocationSelect, setMarkers }) => {
   const [fats, setFats] = useState([]);
@@ -140,80 +146,126 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
   };
 
   const addFat = async (e) => {
-    e.preventDefault();
+      e.preventDefault();
+      
+      // Verificar que fatForm tenga todos los campos necesarios
+      if (!fatForm.IdFat || !fatForm.lat || !fatForm.lng || !fatForm.description) {
+          toast.error('Por favor, completa todos los campos requeridos.');
+          return;
+      }
 
-    // Verificar que fatForm tenga todos los campos necesarios
-    if (!fatForm.lat || !fatForm.lng || !fatForm.description) {
-        toast.error('Por favor, completa todos los campos requeridos.');
-        return;
-    }
+      // Verificar que lat y lng sean números
+      if (isNaN(fatForm.lat) || isNaN(fatForm.lng)) {
+          toast.error('La latitud y longitud deben ser valores numéricos.');
+          return;
+      }
 
-    // Comprobar si el FAT ya existe en Supabase
-    const { data: existingFat, error } = await supabase
-        .from('fats')
-        .select('*')
-        .eq('lat', fatForm.lat)
-        .eq('lng', fatForm.lng);
+      // Comprobar si el FAT ya existe en Supabase
+      const { data: existingFat, error: checkError } = await supabase
+          .from('fats')
+          .select('*')
+          .eq('lat', parseFloat(fatForm.lat)) // Asegúrate de convertir a número
+          .eq('lng', parseFloat(fatForm.lng)); // Asegúrate de convertir a número
 
-    if (error) {
-        console.error('Error checking for existing FAT:', error);
-        return;
-    }
+      if (checkError) {
+          console.error('Error checking for existing FAT:', checkError);
+          toast.error('Error al verificar si el FAT ya existe.');
+          return;
+      }
 
-    if (existingFat && existingFat.length > 0) {
-        toast.error('Estas coordenadas ya están registradas con un FAT');
-        console.log('FAT already exists:', fatForm.IdFat);
-        return;
-    }
+      if (existingFat.length > 0) {
+          toast.error('Estas coordenadas ya están registradas con un FAT');
+          return;
+      }
 
-    // Insertar nuevo FAT en Supabase
-    const { data: insertedFat, error: insertError } = await supabase
-        .from('fats')
-        .insert([fatForm]);
+      // Insertar nuevo FAT en Supabase
+      const { data: insertedFat, error: insertError } = await supabase
+          .from('fats')
+          .insert([fatForm]);
 
-    if (insertError) {
-        console.error('Error inserting FAT:', insertError, fatForm);
-        toast.error('Error al agregar el FAT');
-        return;
-    }
+      if (insertError) {
+          console.error('Error inserting FAT:', insertError);
+          toast.error('Error al agregar el FAT');
+          return;
+      }
 
-    console.log('Inserted FAT:', insertedFat);
-    setFats([...fats, fatForm]);
-    toast.success('FAT agregado correctamente.');
-    setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });
-    setOpenModal(false);
-    setEditFat(null);
+      // Si llegamos aquí, la inserción fue exitosa
+      console.log('Inserted FAT:', insertedFat);
+      
+      // Función para obtener los FATs actualizados
+      const fetchFats = async () => {
+          const { data, error } = await supabase
+              .from('fats')
+              .select('*');
+          if (error) {
+              console.error('Error fetching FATs:', error);
+              return;
+          }
+          console.log('Fetched FATs from Supabase:', data);
+          setFats(data);
+      };
 
-    if (fileInputRef.current) {
-        fileInputRef.current.value = null;
-    }
+      fetchFats();
+      toast.success('FAT agregado correctamente.');
+      setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });
+      setOpenModal(false);
+      setEditFat(null);
+      if (fileInputRef.current) {
+          fileInputRef.current.value = null;
+      }
   };
 
   const handleEditFat = async (e) => {
-    e.preventDefault();
+      e.preventDefault();
 
+      // Verificar que fatForm tenga todos los campos necesarios
+      if (!fatForm.IdFat || !fatForm.lat || !fatForm.lng || !fatForm.description) {
+          toast.error('Por favor, completa todos los campos requeridos.');
+          return;
+      }
 
+      // Validar que lat y lng sean números
+      if (isNaN(fatForm.lat) || isNaN(fatForm.lng)) {
+          toast.error('La latitud y longitud deben ser valores numéricos.');
+          return;
+      }
 
-    console.log('Attempting to update FAT with IdFat:', fatForm.IdFat, 'Data:', fatForm);
-    const { data, error } = await supabase
-      .from('fats')
-      .update(fatForm)
-      .eq('id', fatForm.id)
-      .select()
+      console.log('Attempting to update FAT with IdFat:', fatForm.IdFat, 'Data:', fatForm);
+      
+      const { data, error } = await supabase
+          .from('fats')
+          .update(fatForm)
+          .eq('id', fatForm.id) // Asegúrate de que fatForm.id esté definido
+          .select();
 
-    console.log('Supabase update result:', data, error);
-    if (error) {
-      console.error('Error updating FAT:', error);
-      return;
-    }
-    console.log('Updated FAT:', data);
+      if (error) {
+          console.error('Error updating FAT:', error);
+          toast.error('Error al editar el FAT');
+          return;
+      }
 
-    setFats(fats.map((fat) => (fat.id === fatForm.id ? fatForm : fat)));
-    toast.success('FAT editado correctamente.');
-     console.log('Success Toast should be showing up');
-    setOpenModal(false);
-    setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });
+      console.log('Updated FAT:', data);
+
+      // Función para obtener los FATs actualizados
+      const fetchFats = async () => {
+          const { data, error } = await supabase
+              .from('fats')
+              .select('*');
+          if (error) {
+              console.error('Error fetching FATs:', error);
+              return;
+          }
+          console.log('Fetched FATs from Supabase:', data);
+          setFats(data);
+          // setMarkers(data);
+      };
+
+      fetchFats();
+      toast.success('FAT editado correctamente.');
+      setOpenModal(false);
+      setFatForm({ IdFat: '', lat: '', lng: '', description: '', totalPorts: 4 });
   };
+
   const handleDeleteFat = (fat) => {
     setFatToDelete(fat);
     setDeleteConfirmationOpen(true);
@@ -269,7 +321,6 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
       ),
     },
   ];
-
 
   const handleEdit = (fat) => {
     setFatForm(fat);

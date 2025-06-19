@@ -13,10 +13,10 @@ function App() {
   const [markers, setMarkers] = useState([]);
   const location = useLocation();
   const pageActive = location.pathname.split('/').pop(); // Obtener la última parte de la ruta
-
+  
   return (
     <Box display="flex" height="100vh">
-      <Box sx={{ width: 300, bgcolor: '#0a0d22', color: 'white', padding: '0 20px' }}>
+      <Box sx={{ width: 300, bgcolor: '#0a0d22', color: 'white', padding: '0 20px' }} hidden={pageActive == '' ? true : false}>
         <Typography variant="h6" component="div" sx={{ p: 2 }}>Dashboard</Typography>
         <List sx={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <ListItem

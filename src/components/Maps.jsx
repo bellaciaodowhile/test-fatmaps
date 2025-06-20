@@ -41,6 +41,7 @@ const center = {
 };
 const MAP_ZOOM = 17;
 const MapComponent = () => {
+  const [availablePorts, setAvailablePorts] = useState([]);
   const [openAssignFatModal, setOpenAssignFatModal] = useState(false);
   const [clientsWithoutFat, setClientsWithoutFat] = useState([]); // Para almacenar los clientes sin FAT
   const [selectedClientId, setSelectedClientId] = useState(''); // Para almacenar el cliente seleccionado
@@ -72,6 +73,7 @@ const MapComponent = () => {
     dni: '',
     fat_id: '',
     telefono: '',
+    port: ''
   });
   const mapRef = React.useRef();
 
@@ -144,12 +146,12 @@ const MapComponent = () => {
         const newMarkers = [];
         const clientesMap = {};
         let processedRows = 0; // Contador de filas procesadas
-
         for (const row of json) {
             // Verificar si la fila tiene datos relevantes
             const lat = row['LATITUD DEL FAT'];
             const lng = row['LONGITUD DEL FAT'];
             const nombreCliente = row['NOMBRE Y APELLIDO'];
+            const FAT_UNIQUE = row['FAT'];
 
             // Solo procesar la fila si tiene datos en las columnas relevantes
             if (lat && lng) {
@@ -179,6 +181,7 @@ const MapComponent = () => {
                             lng: lngNum,
                             description: row['DESCRIPCION'],
                             totalPorts: totalPorts,
+                            fat_unique: FAT_UNIQUE,
                         }]);
                     if (error) {
                         console.error('Error al insertar FAT en Supabase:', error);
@@ -189,6 +192,7 @@ const MapComponent = () => {
                             IdFat: row['NOMBRE FAT'],
                             lat: latNum,
                             lng: lngNum,
+                            fat_unique: FAT_UNIQUE,
                             description: row['DESCRIPCION'],
                             totalPorts: totalPorts,
                             clientes: []
@@ -199,7 +203,7 @@ const MapComponent = () => {
                     console.log(`El FAT con coordenadas (${latNum}, ${lngNum}) ya existe.`);
                 }
 
-                const tipoUsuario = row['TIPOUSUARIO'];
+                const tipoUsuario = row['TIPO_USUARIO'];
                 if (nombreCliente) {
                     const cedulaRiff = row['CEDULA/RIFF'];
                     const { data: existingClientes, error: clienteFetchError } = await supabase
@@ -509,6 +513,7 @@ function haversineDistance(coords1, coords2) {
                   cedulaRiff: clientForm.dni, // Cambia a cedulaRiff
                   fat_id: clientForm.fat_id, // Cambia a cedulaRiff
                   telefono: clientForm.telefono, // Cambia a cedulaRiff
+                  port: clientForm.port, // Cambia a cedulaRiff
               }]);
               toast.success('Operación realizada satisfactoriamente.');
 
@@ -569,11 +574,38 @@ function haversineDistance(coords1, coords2) {
     setOpenAssignFatModal(true); // Abre el modal
 };
 
-const handleCloseAssignFatModal = () => {
-    setOpenAssignFatModal(false); // Cierra el modal
-    setSelectedClientId(''); // Limpia el cliente seleccionado
-    setSelectedFatId(''); // Limpia el FAT seleccionado
-};
+    const handleCloseAssignFatModal = () => {
+        setOpenAssignFatModal(false); // Cierra el modal
+        setSelectedClientId(''); // Limpia el cliente seleccionado
+        setSelectedFatId(''); // Limpia el FAT seleccionado
+    };
+
+    const handleFatChange = (fatId) => {
+      console.log(fatId);
+      const selectedFat = markers.find(fat => fat.id == fatId);
+      console.log({
+        type: 'test',
+        selectedFat
+      })
+      if (selectedFat) {
+          const totalPorts = selectedFat.totalPorts; // Total de puertos
+          const occupiedPorts = selectedFat.clientes.map(cliente => cliente.port); // Puertos ocupados por clientes
+          
+          // Generar puertos disponibles
+          const allPorts = Array.from({ length: totalPorts }, (_, i) => `P${(i < 10 ? `0${i+1}` : i+1)}`)
+              .filter(port => !occupiedPorts.includes(port)); // Excluir puertos ocupados
+
+              console.log({
+                type: 'test',
+                allPorts,
+                occupiedPorts
+              })
+
+          setAvailablePorts(allPorts); // Actualizar puertos disponibles
+      } else {
+          setAvailablePorts([]); // Limpiar puertos disponibles si no hay FAT seleccionado
+      }
+    };
 
  
 
@@ -587,88 +619,106 @@ const handleCloseAssignFatModal = () => {
         </Button>
         <div className='mt-4'></div>
         <Button variant="contained" className='w-full font-bold' color="primary" onClick={handleOpenAssignFatModal}>Asignar FAT</Button>
-        <Modal open={openModal} onClose={handleCloseModal}>
-          <Box sx={{ 
-            width: 400, 
-            bgcolor: 'background.paper', 
-            p: 4, 
-            position: 'absolute', 
-            top: '50%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)', 
-            boxShadow: 24 
-          }}>
-            <Typography variant="h6">{isEditing ? 'Editar Cliente' : 'Agregar Cliente'}</Typography>
-            <form onSubmit={addOrUpdateClient}>
-              <TextField
-                label="Nombre"
-                value={clientForm.name}
-                onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })}
-                fullWidth
-                required
-                margin="normal"
-              />
-              <FormControl fullWidth required margin="normal">
-                <InputLabel>Tipo de Usuario</InputLabel>
-                <Select
-                  required
-                  value={clientForm.userType}
-                  onChange={(e) => setClientForm({ ...clientForm, userType: e.target.value })}
-                >
-                  <MenuItem value="RESIDENCIAL">RESIDENCIAL</MenuItem>
-                  <MenuItem value="EMPRESAS">EMPRESAS</MenuItem>
-                  <MenuItem value="PÚBLICO">PÚBLICO</MenuItem>
-                  <MenuItem value="PRIVADO">PRIVADO</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth required margin="normal">
-                <InputLabel>Fats</InputLabel>
-                <Select
-                  required
-                  value={clientForm.fat_id} // Asegúrate de que `fat` esté en el estado de `clientForm`
-                  onChange={(e) => setClientForm({ ...clientForm, fat_id: e.target.value })}
-                >
-                  {markers?.map((fat) => {
-                    if (fat?.clientes?.length < fat.totalPorts) {
-                      return (
-                        <MenuItem key={fat.id} value={fat.id}>
-                          {fat.IdFat}
-                        </MenuItem>
-                      );
-                    }
-                    return null;
-                  })}
-                </Select>
-              </FormControl>
-              <TextField
-                label="Dirección"
-                value={clientForm.address}
-                onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
-                fullWidth
-                required
-                margin="normal"
-              />
-              <TextField
-                label="Teléfono"
-                value={clientForm.telefono}
-                onChange={(e) => setClientForm({ ...clientForm, telefono: e.target.value })}
-                fullWidth
-                required
-                margin="normal"
-              />
-              <TextField
-                label="DNI"
-                value={clientForm.dni}
-                onChange={(e) => setClientForm({ ...clientForm, dni: e.target.value })}
-                fullWidth
-                required
-                margin="normal"
-              />
-              <Button type="submit" variant="contained" color="primary">
-                {isEditing ? 'Actualizar Cliente' : 'Agregar Cliente'}
-              </Button>
-            </form>
-          </Box>
+         <Modal open={openModal} onClose={handleCloseModal}>
+            <Box sx={{
+                width: 400,
+                bgcolor: 'background.paper',
+                p: 4,
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                boxShadow: 24
+            }}>
+                <Typography variant="h6">{isEditing ? 'Editar Cliente' : 'Agregar Cliente'}</Typography>
+                <form onSubmit={addOrUpdateClient}>
+                    <TextField
+                        label="Nombre"
+                        value={clientForm.name}
+                        onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })}
+                        fullWidth
+                        required
+                        margin="normal"
+                    />
+                    <FormControl fullWidth required margin="normal">
+                        <InputLabel>Tipo de Usuario</InputLabel>
+                        <Select
+                            required
+                            value={clientForm.userType}
+                            onChange={(e) => setClientForm({ ...clientForm, userType: e.target.value })}
+                        >
+                            <MenuItem value="RESIDENCIAL">RESIDENCIAL</MenuItem>
+                            <MenuItem value="EMPRESAS">EMPRESAS</MenuItem>
+                            <MenuItem value="PÚBLICO">PÚBLICO</MenuItem>
+                            <MenuItem value="PRIVADO">PRIVADO</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <FormControl fullWidth required margin="normal">
+                        <InputLabel>Fats</InputLabel>
+                        <Select
+                            required
+                            value={clientForm.fat_id}
+                            onChange={(e) => {
+                                const selectedFatId = e.target.value;
+                                setClientForm({ ...clientForm, fat_id: selectedFatId });
+                                handleFatChange(selectedFatId); // Actualizar puertos disponibles al cambiar de FAT
+                            }}
+                        >
+                            {markers?.map((fat) => (
+                                fat?.clientes?.length < fat.totalPorts && (
+                                    <MenuItem key={fat.id} value={fat.id}>
+                                        {fat.fat_unique} - {fat.IdFat}
+                                    </MenuItem>
+                                )
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    {/* Nuevo campo para seleccionar puertos disponibles */}
+                    <FormControl fullWidth required margin="normal">
+                        <InputLabel>Puerto</InputLabel>
+                        <Select
+                            required
+                            value={clientForm.port} // Asegúrate de que `port` esté en el estado de `clientForm`
+                            onChange={(e) => setClientForm({ ...clientForm, port: e.target.value })}
+                        >
+                            {availablePorts.map((port) => (
+                                <MenuItem key={port} value={port}>
+                                    {port}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    <TextField
+                        label="Dirección"
+                        value={clientForm.address}
+                        onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
+                        fullWidth
+                        required
+                        margin="normal"
+                    />
+                    <TextField
+                        label="Teléfono"
+                        value={clientForm.telefono}
+                        onChange={(e) => setClientForm({ ...clientForm, telefono: e.target.value })}
+                        fullWidth
+                        required
+                        margin="normal"
+                    />
+                    <TextField
+                        label="DNI"
+                        value={clientForm.dni}
+                        onChange={(e) => setClientForm({ ...clientForm, dni: e.target.value })}
+                        fullWidth
+                        required
+                        margin="normal"
+                    />
+                    <Button type="submit" variant="contained" color="primary">
+                        {isEditing ? 'Actualizar Cliente' : 'Agregar Cliente'}
+                    </Button>
+                </form>
+            </Box>
         </Modal>
         {/* Asignacion de FAT */}
         <Modal open={openAssignFatModal} onClose={handleCloseAssignFatModal}>
@@ -689,7 +739,7 @@ const handleCloseAssignFatModal = () => {
                     try {
                         const { data, error } = await supabase
                             .from('clientes')
-                            .update({ fat_id: selectedFatId }) // Actualiza el fat_id del cliente
+                            .update({ fat_id: selectedFatId, port: clientForm?.port }) // Actualiza el fat_id del cliente
                             .eq('id', selectedClientId); // Filtra por el id del cliente
 
                         if (error) {
@@ -698,6 +748,7 @@ const handleCloseAssignFatModal = () => {
                         } else {
                             toast.success('FAT asignado correctamente');
                             console.log(`FAT ${selectedFatId} asignado al cliente con ID ${selectedClientId}`);
+                            setClientForm({ id: '', name: '', userType: '', address: '', dni: '' });
                             await fetchMarkers();
                         }
                     } catch (error) {
@@ -726,7 +777,11 @@ const handleCloseAssignFatModal = () => {
                         <Select
                             required
                             value={selectedFatId}
-                            onChange={(e) => setSelectedFatId(e.target.value)}
+                            onChange={(e) => {
+                              const selectedFatId = e.target.value;
+                              handleFatChange(selectedFatId); // Actualizar puertos disponibles al cambiar de FAT
+                              setSelectedFatId(e.target.value)
+                            }}
                         >
                             {markers?.map((fat) => {
                               if (fat?.clientes?.length < fat.totalPorts) {
@@ -738,6 +793,22 @@ const handleCloseAssignFatModal = () => {
                               }
                               return null;
                             })}
+                        </Select>
+                    </FormControl>
+
+                    {/* Nuevo campo para seleccionar puertos disponibles */}
+                    <FormControl fullWidth required margin="normal">
+                        <InputLabel>Puerto</InputLabel>
+                        <Select
+                            required
+                            value={clientForm.port} // Asegúrate de que `port` esté en el estado de `clientForm`
+                            onChange={(e) => setClientForm({ ...clientForm, port: e.target.value })}
+                        >
+                            {availablePorts.map((port) => (
+                                <MenuItem key={port} value={port}>
+                                    {port}
+                                </MenuItem>
+                            ))}
                         </Select>
                     </FormControl>
 
@@ -807,6 +878,7 @@ const handleCloseAssignFatModal = () => {
               {selectedMarker &&  (
                 <Popup onClose={() => setSelectedMarker(null)}>
                     <div className='max-h-[500px] overflow-y-auto overflow-x-hidden'>
+                        <strong className='text-xl'>{marker.fat_unique}</strong>
                         <h5 className='font-bold mb-2'>Coordenadas</h5>
                         <span className='font-bold'>LAT: {marker.lat} <br /> LONG: {marker.lng}</span>
                         <h5 className='font-bold mt-2'>Información general:</h5>
@@ -825,6 +897,9 @@ const handleCloseAssignFatModal = () => {
                                         <div className='flex justify-between mt-2'>
                                             {cliente.cedulaRiff && <span><strong className='text-blue-200'>Cédula/Riff:</strong> <br /> {cliente.cedulaRiff}</span>}
                                             {cliente.telefono && <span><strong className='text-blue-200'>Teléfono:</strong> <br /> {cliente.telefono}</span>}
+                                        </div>
+                                        <div className="mt-2">
+                                          <strong className='text-blue-200'>Puerto:</strong> {cliente.port}
                                         </div>
                                         <button
                                          className='cursor-pointer text-xl absolute top-0 right-[22px] rounded-bl-lg p-1 bg-white text-blue-500 transition-all hover:bg-blue-500 hover:text-white'
@@ -854,11 +929,17 @@ const handleCloseAssignFatModal = () => {
               <h1 className='font-bold text-xl mb-1'>{selectedClient?.fat}</h1>
               {console.log(selectedClient)}
               <p className='mb-1'>¿A qué FAT deseas transferir a <strong className='uppercase'>{selectedClient?.nombreApellido}</strong>?</p>
+              {/* aquivale */}
               <Select
                 fullWidth
                 required
                 value={selectedFat} // Asegúrate de que `fat` esté en el estado de `clientForm`
-                onChange={(e) => setSelectedFat(e.target.value)}
+                
+                onChange={(e) => {
+                  const selectedFatId = e.target.value;
+                  setSelectedFat(e.target.value)
+                  handleFatChange(selectedFatId); // Actualizar puertos disponibles al cambiar de FAT
+                }}
               >
                 {markers?.map((fat) => {
                   if (fat?.clientes?.length < fat.totalPorts) {
@@ -871,10 +952,26 @@ const handleCloseAssignFatModal = () => {
                   return null;
                 })}
               </Select>
+              <FormControl fullWidth required margin="normal">
+                  <InputLabel>Puerto</InputLabel>
+                  <Select
+                      required
+                      value={clientForm.port} // Asegúrate de que `port` esté en el estado de `clientForm`
+                      onChange={(e) => setClientForm({ ...clientForm, port: e.target.value })}
+                  >
+                      {availablePorts.map((port) => (
+                          <MenuItem key={port} value={port}>
+                              {port}
+                          </MenuItem>
+                      ))}
+                  </Select>
+              </FormControl>
+
+
           </DialogContent>
           <DialogActions>
               <Button onClick={() => setIsModalOpen(false)} color="primary">Cancelar</Button>
-              <Button onClick={() => setIsConfirmOpen(true)} color="primary">Transferir</Button>
+              <Button onClick={() => { clientForm?.port ? setIsConfirmOpen(true) : toast.error('Debe elegir un puerto')}} color="primary">Transferir</Button>
           </DialogActions>
         </Dialog>
         <Dialog open={isConfirmOpen} onClose={() => setIsConfirmOpen(false)}>
@@ -884,7 +981,7 @@ const handleCloseAssignFatModal = () => {
                   marker: markers,
                   selectedFat,
                 })}
-              <p>¿Está seguro de que desea transferir a <strong className='uppercase'>{selectedClient?.nombreApellido}</strong> al FAT: <strong className='uppercase'>{markers?.filter(x => x?.id == selectedFat)[0]?.IdFat}</strong>?</p>
+              <p>¿Está seguro de que desea transferir a <strong className='uppercase'>{selectedClient?.nombreApellido}</strong> al puerto <strong className='uppercase'>{clientForm?.port}</strong> en el <strong className='uppercase'>{markers?.filter(x => x?.id == selectedFat)[0]?.fat_unique} - {markers?.filter(x => x?.id == selectedFat)[0]?.IdFat}</strong>?</p>
           </DialogContent>
           <DialogActions>
               <Button onClick={() => setIsConfirmOpen(false)} color="primary">Cancelar</Button>
@@ -894,7 +991,7 @@ const handleCloseAssignFatModal = () => {
                       const fatName = markers?.filter(x => x?.id == selectedFat)[0]?.IdFat;
                       const { data, error } = await supabase
                           .from('clientes')
-                          .update({ fat_id: selectedFat }) // Actualiza el fat_id del cliente
+                          .update({ fat_id: selectedFat, port: clientForm?.port }) // Actualiza el fat_id del cliente
                           .eq('id', selectedClient.id); // Filtra por el id del cliente
 
                       if (error) {
@@ -904,6 +1001,7 @@ const handleCloseAssignFatModal = () => {
                           await fetchMarkers();
                           console.log(`Cliente ${selectedClient?.nombreApellido} transferido a FAT ${fatName}`);
                           toast.success(`Cliente ${selectedClient?.nombreApellido} transferido a FAT ${fatName}`);
+                          setClientForm({ id: '', name: '', userType: '', address: '', dni: '' });
                           // Aquí puedes agregar lógica adicional si es necesario
                       }
                   } catch (error) {
@@ -928,7 +1026,7 @@ const handleCloseAssignFatModal = () => {
                   try {
                       const { data, error } = await supabase
                           .from('clientes')
-                          .update({ fat_id: null }) // Vacía el fat_id del cliente
+                          .update({ fat_id: null, port: null }) // Vacía el fat_id del cliente
                           .eq('id', clientToDelete); // Filtra por el id del cliente
 
                       if (error) {
@@ -1016,7 +1114,7 @@ const handleCloseAssignFatModal = () => {
                           
                           // Solo agregar FATS que estén dentro del radio especificado
                           if (distance <= radiusInMeters) {
-                              newFatList.push({ id: nearestFAT.id, name: nearestFAT.IdFat, distance: distance, lat: nearestFAT.lat, lng: nearestFAT.lng });
+                              newFatList.push({ id: nearestFAT.id, fat_unique: nearestFAT.fat_unique, name: nearestFAT.IdFat, distance: distance, lat: nearestFAT.lat, lng: nearestFAT.lng });
                           }
                       });
 
@@ -1047,7 +1145,7 @@ const handleCloseAssignFatModal = () => {
                     handleMarkerClick(fat);
                   }} 
                   key={fat.id}>
-                      FAT: {fat.name} <br /> Distancia: {fat.distance.toFixed(2)} km
+                      {fat.fat_unique} - {fat.name} <br /> Distancia: {fat.distance.toFixed(2)} km
                   </li>
               ))}
           </ul>

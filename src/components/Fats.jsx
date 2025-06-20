@@ -290,9 +290,10 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
   };
 
   const columns = [
-    { field: 'IdFat', headerName: 'ID FAT', width: 120 },
-    { field: 'description', headerName: 'Descripción', width: 200 },
-    { field: 'totalPorts', headerName: 'Número de Puertos', width: 180 },
+    { field: 'IdFat', headerName: 'ID', width: 50 },
+    { field: 'fat_unique', headerName: 'FAT', width: 100 },
+    { field: 'description', headerName: 'Descripción', width: 100 },
+    { field: 'totalPorts', headerName: 'Número de Puertos', width: 50 },
     { field: 'lat', headerName: 'Latitud', width: 150 },
     { field: 'lng', headerName: 'Longitud', width: 150 },
     {

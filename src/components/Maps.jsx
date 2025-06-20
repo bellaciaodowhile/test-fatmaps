@@ -152,7 +152,7 @@ const MapComponent = () => {
             const nombreCliente = row['NOMBRE Y APELLIDO'];
 
             // Solo procesar la fila si tiene datos en las columnas relevantes
-            if (lat && lng && nombreCliente) {
+            if (lat && lng) {
                 const latNum = Number(lat.replace(',', '.'));
                 const lngNum = parseFloat(lng);
                 const totalPortsString = row['2ºNivel de SPLlitter'] || '';

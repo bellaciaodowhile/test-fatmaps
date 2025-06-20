@@ -787,7 +787,7 @@ function haversineDistance(coords1, coords2) {
                               if (fat?.clientes?.length < fat.totalPorts) {
                                 return (
                                   <MenuItem key={fat.id} value={fat.id}>
-                                    {fat.IdFat}
+                                    {fat.fat_unique} - {fat.IdFat}
                                   </MenuItem>
                                 );
                               }

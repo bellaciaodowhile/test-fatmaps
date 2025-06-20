@@ -189,6 +189,7 @@ const Clients = () => {
     { field: 'id', headerName: 'ID', width: 90 },
     { field: 'nombreApellido', headerName: 'Nombre', width: 150 },
     { field: 'tipoUsuario', headerName: 'Tipo de Usuario', width: 150 },
+    { field: 'port', headerName: 'Puerto', width: 50 },
     { field: 'telefono', headerName: 'Teléfono', width: 150 },
     { field: 'direccion', headerName: 'Dirección', width: 200 },
     { field: 'cedulaRiff', headerName: 'DNI', width: 150 },
@@ -296,7 +297,7 @@ const Clients = () => {
                       if (fat?.clientes?.length < fat.totalPorts) {
                         return (
                           <MenuItem key={fat.id} value={fat.id}>
-                            {fat.IdFat}
+                            {fat.fat_unique} - {fat.IdFat}
                           </MenuItem>
                         );
                       }

@@ -789,7 +789,7 @@ const handleCloseAssignFatModal = () => {
         </ul>
       </div>
       <div className='relative w-3/4'>
-        <MapContainer center={center} zoom={18} style={{ height: '100vh', width: '100%' }} ref={mapRef}>
+        <MapContainer center={center} zoom={16} style={{ height: '100vh', width: '100%' }} ref={mapRef}>
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution=''

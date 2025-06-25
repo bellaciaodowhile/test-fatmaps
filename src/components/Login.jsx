@@ -36,7 +36,7 @@ const Login = () => {
     <Container component="main" maxWidth="xs" sx={{marginTop: '100px'}}>
       <Paper elevation={3} style={{ padding: '20px' }}>
         <Typography variant="h5" align="center" gutterBottom>
-          Iniciar Sesión
+          Cerrar Sesion
         </Typography>
         <form onSubmit={handleSubmit}>
           <TextField
@@ -65,7 +65,7 @@ const Login = () => {
             color="primary"
             style={{ marginTop: '16px' }}
           >
-            Iniciar Sesión
+            Iniciar Ssión
           </Button>
         </form>
       </Paper>

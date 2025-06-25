@@ -312,7 +312,7 @@ const Clients = () => {
         </Box>
       </Modal>
       <Typography variant="h6" sx={{ mt: 4 }}>Lista de Clientes</Typography>
-      <div style={{ height: 400, width: '100%', marginTop: '20px' }}>
+      <div style={{ height: 400, width: '1024px', marginTop: '20px' }}>
         <DataGrid
           showToolbar 
           rows={clients}

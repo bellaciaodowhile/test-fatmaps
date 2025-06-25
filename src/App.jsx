@@ -68,6 +68,7 @@ function App() {
           <Route path="/fats" element={<Fats />} />
           <Route path="/map" element={<Maps />} />
           <Route path="/map/search" element={<Maps />} />
+          <Route path="*" element={<Maps />} />
         </Routes>
       </Box>
       <ToastContainer />

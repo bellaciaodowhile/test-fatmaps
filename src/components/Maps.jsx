@@ -154,6 +154,10 @@ const MapComponent = () => {
             const FAT_UNIQUE = row['FAT'];
 
             // Solo procesar la fila si tiene datos en las columnas relevantes
+            console.log({
+              lat,
+              lng
+            })
             if (lat && lng) {
                 const latNum = Number(lat.replace(',', '.'));
                 const lngNum = parseFloat(lng);

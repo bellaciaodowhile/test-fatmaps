@@ -146,6 +146,7 @@ const MapComponent = () => {
         const newMarkers = [];
         const clientesMap = {};
         let processedRows = 0; // Contador de filas procesadas
+        console.log(json)
         for (const row of json) {
             // Verificar si la fila tiene datos relevantes
             const lat = row['LATITUD DEL FAT'];
@@ -159,12 +160,18 @@ const MapComponent = () => {
               lng
             })
             if (lat && lng) {
-                const latNum = Number(lat.replace(',', '.'));
-                const lngNum = parseFloat(lng);
+                const latNum = String(lat.replace(',', '.'));
+                const lngNum = String(lng) + '0';
                 const totalPortsString = row['2ºNivel de SPLlitter'] || '';
                 const totalPortsMatch = totalPortsString.match(/\((\d+):(\d+)\)/);
                 const totalPorts = totalPortsMatch ? parseInt(totalPortsMatch[2], 10) : 0;
 
+                console.log({
+                  type: 'test',
+                  latNum,
+                  lngNum
+                })
+                
                 const { data: existingFats, error: fetchError } = await supabase
                     .from('fats')
                     .select('*')

@@ -146,19 +146,16 @@ const MapComponent = () => {
         const newMarkers = [];
         const clientesMap = {};
         let processedRows = 0; // Contador de filas procesadas
-        console.log(json)
+        console.log(json);
+
         for (const row of json) {
-            // Verificar si la fila tiene datos relevantes
             const lat = row['LATITUD DEL FAT'];
             const lng = row['LONGITUD DEL FAT'];
             const nombreCliente = row['NOMBRE Y APELLIDO'];
             const FAT_UNIQUE = row['FAT'];
 
-            // Solo procesar la fila si tiene datos en las columnas relevantes
-            console.log({
-              lat,
-              lng
-            })
+            console.log({ lat, lng });
+
             if (lat && lng) {
                 const latNum = String(lat.replace(',', '.'));
                 const lngNum = String(lng) + '0';
@@ -166,17 +163,14 @@ const MapComponent = () => {
                 const totalPortsMatch = totalPortsString.match(/\((\d+):(\d+)\)/);
                 const totalPorts = totalPortsMatch ? parseInt(totalPortsMatch[2], 10) : 0;
 
-                console.log({
-                  type: 'test',
-                  latNum,
-                  lngNum
-                })
-                
+                console.log({ latNum, lngNum });
+
                 const { data: existingFats, error: fetchError } = await supabase
                     .from('fats')
                     .select('*')
                     .eq('lat', latNum)
                     .eq('lng', lngNum);
+
                 if (fetchError) {
                     console.error('Error al verificar FAT existente:', fetchError);
                     continue;
@@ -193,7 +187,14 @@ const MapComponent = () => {
                             description: row['DESCRIPCION'],
                             totalPorts: totalPorts,
                             fat_unique: FAT_UNIQUE,
-                        }]);
+                        }])
+                        .select()
+
+                        console.log({
+                          type:'aqui',
+                          fatData,
+                        })
+
                     if (error) {
                         console.error('Error al insertar FAT en Supabase:', error);
                     } else if (fatData && fatData.length > 0) {
@@ -221,6 +222,7 @@ const MapComponent = () => {
                         .from('clientes')
                         .select('*')
                         .eq('cedulaRiff', cedulaRiff);
+
                     if (clienteFetchError) {
                         console.error('Error al verificar cliente existente:', clienteFetchError);
                         continue;
@@ -235,12 +237,15 @@ const MapComponent = () => {
                             fat_id: fatId,
                             port: row['PUERTO'],
                         };
+
                         const { error: clienteError } = await supabase
                             .from('clientes')
                             .insert([cliente]);
+
                         if (clienteError) {
                             console.error('Error al insertar cliente en Supabase:', clienteError);
                         } else {
+                            console.log(`Cliente ${nombreCliente} registrado exitosamente para FAT ID: ${fatId}`);
                             if (!clientesMap[fatId]) {
                                 clientesMap[fatId] = [];
                             }
@@ -253,7 +258,6 @@ const MapComponent = () => {
 
                 processedRows++; // Incrementar el contador de filas procesadas
                 console.log(`Procesando fila ${processedRows} de ${totalRows}`); // Mostrar progreso
-                // Aquí puedes actualizar el estado para mostrar el progreso en la UI
                 setProgress(`Procesando fila ${processedRows} de ${totalRows}`);
             } else {
                 console.log(`Fila vacía o incompleta, no se procesará: ${JSON.stringify(row)}`);
@@ -295,8 +299,9 @@ const MapComponent = () => {
         setLoading(false); // Oculta el preloader después de cargar los datos
         setProgress('Carga completada'); // Mensaje de finalización
     };
+
     reader.readAsArrayBuffer(file);
-  };
+};
 
    const fetchMarkers = async () => {
       const { data: fats, error: fatsError } = await supabase.from('fats').select('*');
@@ -878,7 +883,7 @@ function haversineDistance(coords1, coords2) {
           />
           {markers.map(marker => (
             <Marker
-              key={marker.id}
+              key={`marker-${marker.id}`}
               position={{ lat: marker.lat, lng: marker.lng }}
               icon={createMarkerIcon(marker?.clientes?.length >= marker.totalPorts)}
               eventHandlers={{
@@ -938,7 +943,6 @@ function haversineDistance(coords1, coords2) {
           <DialogTitle>Transferir Cliente de:</DialogTitle>
           <DialogContent>
               <h1 className='font-bold text-xl mb-1'>{selectedClient?.fat}</h1>
-              {console.log(selectedClient)}
               <p className='mb-1'>¿A qué FAT deseas transferir a <strong className='uppercase'>{selectedClient?.nombreApellido}</strong>?</p>
               {/* aquivale */}
               <Select

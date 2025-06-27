@@ -873,9 +873,9 @@ function haversineDistance(coords1, coords2) {
           />
         </div>
         <ul>
-          {filteredMarkers.map(marker => (
+          {filteredMarkers.map((marker, index) => (
             <li
-              key={marker.id}
+              key={`filtered-marker-${index}`}
               className='cursor-pointer mb-2 p-2 rounded-lg hover:bg-blue-100 transition duration-200 font-semibold flex items-center gap-2'
               onClick={() => {
                 handleSidebarClick(marker);
@@ -893,9 +893,9 @@ function haversineDistance(coords1, coords2) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution=''
           />
-          {markers.map(marker => (
+          {markers.map((marker, index) => (
             <Marker
-              key={`marker-${marker.id}`}
+              key={`marker-map-${index}`}
               position={{ lat: marker.lat, lng: marker.lng }}
               icon={createMarkerIcon(marker?.clientes?.length >= marker.totalPorts)}
               eventHandlers={{

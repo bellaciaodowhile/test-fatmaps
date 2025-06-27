@@ -1,7 +1,7 @@
 // src/components/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, TextField, Typography, Container, Paper, Snackbar } from '@mui/material';
+import { Box, Button, TextField, Typography, Container, Paper, Snackbar } from '@mui/material';
 import MuiAlert from '@mui/material/Alert';
 
 const Alert = React.forwardRef(function Alert(props, ref) {
@@ -33,6 +33,17 @@ const Login = () => {
   };
 
   return (
+    <Box
+    sx={{
+      backgroundImage: 'url("\fondo.jpg")', // ruta a tu imagen en la carpeta /public
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}
+  >
     <Container component="main" maxWidth="xs" sx={{marginTop: '100px'}}>
       <Paper elevation={3} style={{ padding: '20px' }}>
         <Typography variant="h5" align="center" gutterBottom>
@@ -75,6 +86,7 @@ const Login = () => {
         </Alert>
       </Snackbar>
     </Container>
+     </Box>
   );
 };
 

@@ -73,7 +73,8 @@ const MapComponent = () => {
     dni: '',
     fat_id: '',
     telefono: '',
-    port: ''
+    port: '',
+    splitter: ''
   });
   const mapRef = React.useRef();
 
@@ -153,6 +154,7 @@ const MapComponent = () => {
             const lng = row['LONGITUD DEL FAT'];
             const nombreCliente = row['NOMBRE Y APELLIDO'];
             const FAT_UNIQUE = row['FAT'];
+            const splitter = row['SPLITTER'];
 
             console.log({ lat, lng });
 
@@ -236,6 +238,7 @@ const MapComponent = () => {
                             tipoUsuario: tipoUsuario,
                             fat_id: fatId,
                             port: row['PUERTO'],
+                            splitter: row['SPLITTER'],
                         };
 
                         const { error: clienteError } = await supabase
@@ -530,6 +533,7 @@ function haversineDistance(coords1, coords2) {
                   fat_id: clientForm.fat_id, // Cambia a cedulaRiff
                   telefono: clientForm.telefono, // Cambia a cedulaRiff
                   port: clientForm.port, // Cambia a cedulaRiff
+                  splitter: clientForm.splitter, // Cambia a cedulaRiff
               }]);
               toast.success('Operación realizada satisfactoriamente.');
 
@@ -706,6 +710,14 @@ function haversineDistance(coords1, coords2) {
                         </Select>
                     </FormControl>
 
+                    <TextField
+                        label="Splitter"
+                        value={clientForm.splitter}
+                        onChange={(e) => setClientForm({ ...clientForm, splitter: e.target.value })}
+                        fullWidth
+                        required
+                        margin="normal"
+                    />
                     <TextField
                         label="Dirección"
                         value={clientForm.address}
@@ -914,8 +926,12 @@ function haversineDistance(coords1, coords2) {
                                             {cliente.cedulaRiff && <span><strong className='text-blue-200'>Cédula/Riff:</strong> <br /> {cliente.cedulaRiff}</span>}
                                             {cliente.telefono && <span><strong className='text-blue-200'>Teléfono:</strong> <br /> {cliente.telefono}</span>}
                                         </div>
+                                        <div className="mt-2 flex gap-3">
+                                          <div><strong className='text-blue-200'>Puerto:</strong> {cliente.port}</div>
+                                          <div><strong className='text-blue-200'>Splitter:</strong> {cliente?.splitter}</div>
+                                        </div>
                                         <div className="mt-2">
-                                          <strong className='text-blue-200'>Puerto:</strong> {cliente.port}
+                                          <strong className='text-blue-200'>Tipo:</strong> {cliente.tipoUsuario}
                                         </div>
                                         <button
                                          className='cursor-pointer text-xl absolute top-0 right-[22px] rounded-bl-lg p-1 bg-white text-blue-500 transition-all hover:bg-blue-500 hover:text-white'

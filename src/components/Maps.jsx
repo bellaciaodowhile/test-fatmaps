@@ -369,7 +369,7 @@ const MapComponent = () => {
  const handleSearch = (term) => {
     setSearchTerm(term);
     const filtered = markers.filter(marker => {
-      const matchesFat = marker.IdFat.toLowerCase().includes(term.toLowerCase());
+      const matchesFat = marker.fat_unique.toLowerCase().includes(term.toLowerCase());
       const matchesClient = marker.clientes && marker.clientes.some(cliente => 
         cliente.nombreApellido.toLowerCase().includes(term.toLowerCase())
       );
@@ -882,7 +882,7 @@ function haversineDistance(coords1, coords2) {
                 handleMarkerClick(marker);
               }}
             >
-              <span className={`w-[10px] h-[10px] bg-${marker?.clientes?.length >= marker.totalPorts ? 'red' : 'green'}-500 rounded-full inline-block`}></span> {marker.IdFat}             
+              <span className={`w-[10px] h-[10px] bg-${marker?.clientes?.length >= marker.totalPorts ? 'red' : 'green'}-500 rounded-full inline-block`}></span> {console.log(marker)} {marker.fat_unique}             
             </li>
           ))}
         </ul>

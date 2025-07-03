@@ -21,7 +21,7 @@ import {
 import { ToastContainer, toast } from 'react-toastify';
 
 const SUPABASE_URL = 'https://qmzmznpbpvonegajtavg.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtem16bnBicHZvbmVnYWp0YXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMjE5NjMsImV4cCI6MjA2NTU5Nzk2M30.YkJmlrS_55zqdJ-Iu9esXJO56LfJwg-itB6IwGUJnA8';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3cnp2d2FtZmdldXFpemV3aGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1NjczNTAsImV4cCI6MjA2NzE0MzM1MH0.Y4-F12FQdpTXhFl-gRrZkcjREiKf2Eu99IxHSS0E0XQ';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const createMarkerIcon = (isFull) => {

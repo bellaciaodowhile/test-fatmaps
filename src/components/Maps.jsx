@@ -73,7 +73,8 @@ const MapComponent = () => {
     dni: '',
     fat_id: '',
     telefono: '',
-    port: ''
+    port: '',
+    splitter: ''
   });
   const mapRef = React.useRef();
 
@@ -153,6 +154,7 @@ const MapComponent = () => {
             const lng = row['LONGITUD DEL FAT'];
             const nombreCliente = row['NOMBRE Y APELLIDO'];
             const FAT_UNIQUE = row['FAT'];
+            const splitter = row['SPLITTER'];
 
             console.log({ lat, lng });
 
@@ -236,6 +238,7 @@ const MapComponent = () => {
                             tipoUsuario: tipoUsuario,
                             fat_id: fatId,
                             port: row['PUERTO'],
+                            splitter: row['SPLITTER'],
                         };
 
                         const { error: clienteError } = await supabase
@@ -366,7 +369,7 @@ const MapComponent = () => {
  const handleSearch = (term) => {
     setSearchTerm(term);
     const filtered = markers.filter(marker => {
-      const matchesFat = marker.IdFat.toLowerCase().includes(term.toLowerCase());
+      const matchesFat = marker.fat_unique.toLowerCase().includes(term.toLowerCase());
       const matchesClient = marker.clientes && marker.clientes.some(cliente => 
         cliente.nombreApellido.toLowerCase().includes(term.toLowerCase())
       );
@@ -530,6 +533,7 @@ function haversineDistance(coords1, coords2) {
                   fat_id: clientForm.fat_id, // Cambia a cedulaRiff
                   telefono: clientForm.telefono, // Cambia a cedulaRiff
                   port: clientForm.port, // Cambia a cedulaRiff
+                  splitter: clientForm.splitter, // Cambia a cedulaRiff
               }]);
               toast.success('Operación realizada satisfactoriamente.');
 
@@ -707,6 +711,14 @@ function haversineDistance(coords1, coords2) {
                     </FormControl>
 
                     <TextField
+                        label="Splitter"
+                        value={clientForm.splitter}
+                        onChange={(e) => setClientForm({ ...clientForm, splitter: e.target.value })}
+                        fullWidth
+                        required
+                        margin="normal"
+                    />
+                    <TextField
                         label="Dirección"
                         value={clientForm.address}
                         onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
@@ -861,16 +873,16 @@ function haversineDistance(coords1, coords2) {
           />
         </div>
         <ul>
-          {filteredMarkers.map(marker => (
+          {filteredMarkers.map((marker, index) => (
             <li
-              key={marker.id}
+              key={`filtered-marker-${index}`}
               className='cursor-pointer mb-2 p-2 rounded-lg hover:bg-blue-100 transition duration-200 font-semibold flex items-center gap-2'
               onClick={() => {
                 handleSidebarClick(marker);
                 handleMarkerClick(marker);
               }}
             >
-              <span className={`w-[10px] h-[10px] bg-${marker?.clientes?.length >= marker.totalPorts ? 'red' : 'green'}-500 rounded-full inline-block`}></span> {marker.IdFat}             
+              <span className={`w-[10px] h-[10px] bg-${marker?.clientes?.length >= marker.totalPorts ? 'red' : 'green'}-500 rounded-full inline-block`}></span> {console.log(marker)} {marker.fat_unique}             
             </li>
           ))}
         </ul>
@@ -881,9 +893,9 @@ function haversineDistance(coords1, coords2) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution=''
           />
-          {markers.map(marker => (
+          {markers.map((marker, index) => (
             <Marker
-              key={`marker-${marker.id}`}
+              key={`marker-map-${index}`}
               position={{ lat: marker.lat, lng: marker.lng }}
               icon={createMarkerIcon(marker?.clientes?.length >= marker.totalPorts)}
               eventHandlers={{
@@ -914,8 +926,12 @@ function haversineDistance(coords1, coords2) {
                                             {cliente.cedulaRiff && <span><strong className='text-blue-200'>Cédula/Riff:</strong> <br /> {cliente.cedulaRiff}</span>}
                                             {cliente.telefono && <span><strong className='text-blue-200'>Teléfono:</strong> <br /> {cliente.telefono}</span>}
                                         </div>
+                                        <div className="mt-2 flex gap-3">
+                                          <div><strong className='text-blue-200'>Puerto:</strong> {cliente.port}</div>
+                                          <div><strong className='text-blue-200'>Splitter:</strong> {cliente?.splitter}</div>
+                                        </div>
                                         <div className="mt-2">
-                                          <strong className='text-blue-200'>Puerto:</strong> {cliente.port}
+                                          <strong className='text-blue-200'>Tipo:</strong> {cliente.tipoUsuario}
                                         </div>
                                         <button
                                          className='cursor-pointer text-xl absolute top-0 right-[22px] rounded-bl-lg p-1 bg-white text-blue-500 transition-all hover:bg-blue-500 hover:text-white'

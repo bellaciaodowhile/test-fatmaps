@@ -30,7 +30,9 @@ const Clients = () => {
     port: '',
     telefono: '',
     fat_id: '',
+    splitter: '',
   });
+   const [availablePorts, setAvailablePorts] = useState([]);
   const [openModal, setOpenModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [markers, setMarkers] = useState([]);
@@ -62,6 +64,33 @@ const Clients = () => {
     };
     fetchMarkers();
   }, []);
+
+  const handleFatChange = (fatId) => {
+      console.log(fatId);
+      const selectedFat = markers.find(fat => fat.id == fatId);
+      console.log({
+        type: 'test',
+        selectedFat
+      })
+      if (selectedFat) {
+          const totalPorts = selectedFat.totalPorts; // Total de puertos
+          const occupiedPorts = selectedFat.clientes.map(cliente => cliente.port); // Puertos ocupados por clientes
+          
+          // Generar puertos disponibles
+          const allPorts = Array.from({ length: totalPorts }, (_, i) => `P${(i < 10 ? `0${i+1}` : i+1)}`)
+              .filter(port => !occupiedPorts.includes(port)); // Excluir puertos ocupados
+
+              console.log({
+                type: 'test',
+                allPorts,
+                occupiedPorts
+              })
+
+          setAvailablePorts(allPorts); // Actualizar puertos disponibles
+      } else {
+          setAvailablePorts([]); // Limpiar puertos disponibles si no hay FAT seleccionado
+      }
+    };
 
   const fetchClients = async () => {
   const { data: clients, error: clientsError } = await supabase.from('clientes').select('*');
@@ -113,6 +142,7 @@ const Clients = () => {
          port: client.port, // Asegúrate de que el nombre coincida
          telefono: client.telefono, // Asegúrate de que el nombre coincida
          fat_id: client.fat_id, // Asegúrate de que el nombre coincida
+         splitter: client.splitter, // Asegúrate de que el nombre coincida
        });
        setIsEditing(true);
      } else {
@@ -139,9 +169,34 @@ const Clients = () => {
                 cedulaRiff: clientForm.dni, // Cambia a cedulaRiff
                 telefono: clientForm.telefono, // Cambia a cedulaRiff
                 fat_id: clientForm.fat_id, // Cambia a cedulaRiff
+                port: clientForm.port, // Cambia a cedulaRiff
+                splitter: clientForm.splitter, // Cambia a cedulaRiff
             })
             .eq('id', clientForm.id);
             toast.success('Operación realizada satisfactoriamente.');
+            const fetchMarkers = async () => {
+            const { data: fats, error: fatsError } = await supabase.from('fats').select('*');
+            if (fatsError) {
+              console.error('Error fetching FATs:', fatsError);
+              return;
+            }
+            const { data: clientes, error: clientesError } = await supabase.from('clientes').select('*');
+            if (clientesError) {
+              console.error('Error fetching Clientes:', clientesError);
+              return;
+            }
+            const fatsWithClients = fats.map(fat => {
+              const associatedClients = clientes.filter(cliente => cliente.fat_id == fat.id);
+              return {
+                ...fat,
+                clientes: associatedClients,
+              };
+            });
+            console.log(fatsWithClients)
+            setMarkers(fatsWithClients);
+            setFilteredMarkers(fatsWithClients);
+          };
+          fetchMarkers();
         if (error) {
             toast.error('Ha ocurrido un error...');
             console.error('Error updating client:', error);
@@ -157,8 +212,33 @@ const Clients = () => {
                 cedulaRiff: clientForm.dni, // Cambia a cedulaRiff
                 telefono: clientForm.telefono, // Cambia a cedulaRiff
                 fat_id: clientForm.fat_id, // Cambia a cedulaRiff
+                port: clientForm.port, // Cambia a cedulaRiff
+                splitter: clientForm.splitter, // Cambia a cedulaRiff
             }]);
             toast.success('Operación realizada satisfactoriamente.');
+            const fetchMarkers = async () => {
+            const { data: fats, error: fatsError } = await supabase.from('fats').select('*');
+            if (fatsError) {
+              console.error('Error fetching FATs:', fatsError);
+              return;
+            }
+            const { data: clientes, error: clientesError } = await supabase.from('clientes').select('*');
+            if (clientesError) {
+              console.error('Error fetching Clientes:', clientesError);
+              return;
+            }
+            const fatsWithClients = fats.map(fat => {
+              const associatedClients = clientes.filter(cliente => cliente.fat_id == fat.id);
+              return {
+                ...fat,
+                clientes: associatedClients,
+              };
+            });
+      console.log(fatsWithClients)
+      setMarkers(fatsWithClients);
+      setFilteredMarkers(fatsWithClients);
+    };
+    fetchMarkers();
         if (error) {
             toast.error('Ha ocurrido un error...');
             console.error('Error adding client:', error);
@@ -190,6 +270,7 @@ const Clients = () => {
     { field: 'nombreApellido', headerName: 'Nombre', width: 150 },
     { field: 'tipoUsuario', headerName: 'Tipo de Usuario', width: 150 },
     { field: 'port', headerName: 'Puerto', width: 50 },
+    { field: 'splitter', headerName: 'Splitter', width: 80 },
     { field: 'telefono', headerName: 'Teléfono', width: 150 },
     { field: 'direccion', headerName: 'Dirección', width: 200 },
     { field: 'cedulaRiff', headerName: 'DNI', width: 150 },
@@ -262,6 +343,51 @@ const Clients = () => {
                 <MenuItem value="PRIVADO">PRIVADO</MenuItem>
               </Select>
             </FormControl>
+            <FormControl fullWidth required margin="normal">
+                <InputLabel>FAT</InputLabel>
+                <Select
+                    required
+                    value={clientForm.fat_id}
+                    onChange={(e) => {
+                      const selectedFatId = e.target.value;
+                      setClientForm({ ...clientForm, fat_id: e.target.value })
+                      handleFatChange(selectedFatId);
+                    }}
+                >
+                    {markers?.map((fat) => {
+                      if (fat?.clientes?.length < fat.totalPorts) {
+                        return (
+                          <MenuItem key={fat.id} value={fat.id}>
+                            {fat.fat_unique} - {fat.IdFat}
+                          </MenuItem>
+                        );
+                      }
+                      return null;
+                    })}
+                </Select>
+            </FormControl>
+             <FormControl fullWidth required margin="normal">
+                <InputLabel>Puerto</InputLabel>
+                <Select
+                    required
+                    value={clientForm.port} // Asegúrate de que `port` esté en el estado de `clientForm`
+                    onChange={(e) => setClientForm({ ...clientForm, port: e.target.value })}
+                >
+                    {availablePorts.map((port) => (
+                        <MenuItem key={port} value={port}>
+                            {port}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+            <TextField
+              label="Splitter"
+              value={clientForm.splitter}
+              onChange={(e) => setClientForm({ ...clientForm, splitter: e.target.value })}
+              fullWidth
+              required
+              margin="normal"
+            />
             <TextField
               label="Dirección"
               value={clientForm.address}
@@ -286,25 +412,6 @@ const Clients = () => {
               required
               margin="normal"
             />
-            <FormControl fullWidth required margin="normal">
-                <InputLabel>FAT</InputLabel>
-                <Select
-                    required
-                    value={clientForm.fat_id}
-                    onChange={(e) => setClientForm({ ...clientForm, fat_id: e.target.value })}
-                >
-                    {markers?.map((fat) => {
-                      if (fat?.clientes?.length < fat.totalPorts) {
-                        return (
-                          <MenuItem key={fat.id} value={fat.id}>
-                            {fat.fat_unique} - {fat.IdFat}
-                          </MenuItem>
-                        );
-                      }
-                      return null;
-                    })}
-                </Select>
-            </FormControl>
             <Button type="submit" variant="contained" color="primary">
               {isEditing ? 'Actualizar Cliente' : 'Agregar Cliente'}
             </Button>

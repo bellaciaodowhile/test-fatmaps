@@ -20,6 +20,7 @@ const Login = () => {
     if (username === 'admin' && password === 'contrasena') {
       navigate('/map'); // Redirect to the dashboard
     } else {
+      
       setError('Credenciales incorrectas');
       setOpen(true);
     }

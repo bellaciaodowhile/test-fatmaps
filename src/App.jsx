@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Box, Typography, List, ListItem, ListItemText } from '@mui/material';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -13,7 +13,14 @@ function App() {
   const [markers, setMarkers] = useState([]);
   const location = useLocation();
   const pageActive = location.pathname.split('/').pop(); // Obtener la última parte de la ruta
-  
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    console.log('logout');
+    if (localStorage.getItem('session')) {
+      localStorage.removeItem('session');
+      navigate('/')
+    }
+  }
   return (
     <Box display="flex" height="100vh">
       <Box sx={{ width: 300, bgcolor: '#0a0d22', color: 'white', padding: '0 20px' }} hidden={pageActive == '' ? true : false}>
@@ -57,6 +64,17 @@ function App() {
             }}
           >
             <ListItemText primary="Mapa" />
+          </ListItem>
+          <ListItem
+            onClick={handleLogout}
+            sx={{
+              bgcolor: '#c6362c',
+              borderRadius: '6px',
+              padding: '10px 16px',
+              cursor: 'pointer'
+            }}
+          >
+            <ListItemText primary="Cerrar sesión" />
           </ListItem>
         </List>
       </Box>

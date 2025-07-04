@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, redirect } from 'react-router-dom';
 import {
   Box,
   TextField,
@@ -14,7 +14,6 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import { createClient } from '@supabase/supabase-js';
 import { ToastContainer, toast } from 'react-toastify';
-
 const SUPABASE_URL = 'https://rwrzvwamfgeuqizewhac.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3cnp2d2FtZmdldXFpemV3aGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1NjczNTAsImV4cCI6MjA2NzE0MzM1MH0.Y4-F12FQdpTXhFl-gRrZkcjREiKf2Eu99IxHSS0E0XQ';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -32,12 +31,12 @@ const Clients = () => {
     fat_id: '',
     splitter: '',
   });
-   const [availablePorts, setAvailablePorts] = useState([]);
+  const [availablePorts, setAvailablePorts] = useState([]);
   const [openModal, setOpenModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [markers, setMarkers] = useState([]);
   const [filteredMarkers, setFilteredMarkers] = useState([]);
-
+  const navigate = useNavigate();
   useEffect(() => {
     fetchClients();
     const fetchMarkers = async () => {
@@ -63,6 +62,12 @@ const Clients = () => {
       setFilteredMarkers(fatsWithClients);
     };
     fetchMarkers();
+
+    if (!localStorage.getItem('session')) {
+      navigate('/')
+      return redirect ;
+    }
+    
   }, []);
 
   const handleFatChange = (fatId) => {

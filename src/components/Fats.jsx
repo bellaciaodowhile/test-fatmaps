@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
+import { useNavigate, redirect } from 'react-router-dom';
 const SUPABASE_URL = 'https://rwrzvwamfgeuqizewhac.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3cnp2d2FtZmdldXFpemV3aGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1NjczNTAsImV4cCI6MjA2NzE0MzM1MH0.Y4-F12FQdpTXhFl-gRrZkcjREiKf2Eu99IxHSS0E0XQ';
 
@@ -40,25 +40,28 @@ const Fats = ({ onLocationSelect, setMarkers }) => {
   const [importResults, setImportResults] = useState([]);
   const [showImportResultsModal, setShowImportResultsModal] = useState(false);
   const fileInputRef = React.useRef(null);
-
+  const navigate = useNavigate();
   useEffect(() => {
     const fetchFats = async () => {
       const { data, error } = await supabase
         .from('fats')
         .select('*');
 
-      if (error) {
-        console.error('Error fetching FATs:', error);
-        return;
-      }
+    if (error) {
+      console.error('Error fetching FATs:', error);
+      return;
+    }
 
       console.log('Fetched FATs from Supabase:', data);
       setFats(data);
       // setMarkers(data);
     };
-
-
     fetchFats();
+
+    if (!localStorage.getItem('session')) {
+      navigate('/')
+      return redirect ;
+    }
   }, [setMarkers, setFats]);
 
   const handleFileUpload = (e) => {

@@ -19,8 +19,8 @@ const Login = () => {
     e.preventDefault();
     if (username === 'admin' && password === 'contrasena') {
       navigate('/map'); // Redirect to the dashboard
+      localStorage.setItem('session', '1');
     } else {
-      
       setError('Credenciales incorrectas');
       setOpen(true);
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, redirect, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import 'leaflet/dist/leaflet.css';
@@ -107,7 +107,7 @@ const MapComponent = () => {
   }
   // Llama a la función con las coordenadas deseadas
   runMap(lat, lng);
-
+  const navigate = useNavigate();
   useEffect(() => {
     const fetchMarkers = async () => {
       const { data: fats, error: fatsError } = await supabase.from('fats').select('*');
@@ -132,6 +132,10 @@ const MapComponent = () => {
       setFilteredMarkers(fatsWithClients);
     };
     fetchMarkers();
+    if (!localStorage.getItem('session')) {
+      navigate('/')
+      return redirect ;
+    }
   }, []);
 
   const handleFileUpload = async (event) => {

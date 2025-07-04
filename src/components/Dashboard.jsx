@@ -57,7 +57,7 @@ const Dashboard = () => {
                 '&:hover': { bgcolor: '#494aa7' }, // Color de fondo al pasar el mouse (opaco)
                 }}
             >
-                <ListItemText primary="FATs" />
+                <ListItemText primary="FAT" />
             </ListItem>
              <ListItem
                 button

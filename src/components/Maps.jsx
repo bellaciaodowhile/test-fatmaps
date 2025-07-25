@@ -20,15 +20,66 @@ import {
 } from '@mui/material';
 import { ToastContainer, toast } from 'react-toastify';
 
-const SUPABASE_URL = 'https://rwrzvwamfgeuqizewhac.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3cnp2d2FtZmdldXFpemV3aGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1NjczNTAsImV4cCI6MjA2NzE0MzM1MH0.Y4-F12FQdpTXhFl-gRrZkcjREiKf2Eu99IxHSS0E0XQ';
+const SUPABASE_URL = 'https://qmzmznpbpvonegajtavg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtem16bnBicHZvbmVnYWp0YXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMjE5NjMsImV4cCI6MjA2NTU5Nzk2M30.YkJmlrS_55zqdJ-Iu9esXJO56LfJwg-itB6IwGUJnA8';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const createMarkerIcon = (isFull) => {
+// Function to calculate splitter status for a FAT
+const calculateSplitterStatus = (marker) => {
+  if (!marker?.clientes || !marker.totalPorts) return { status: 'empty', splitters: [] };
+  
+  // Group clients by splitter
+  const splitterGroups = {};
+  marker.clientes.forEach(cliente => {
+    if (cliente.splitter) {
+      if (!splitterGroups[cliente.splitter]) {
+        splitterGroups[cliente.splitter] = [];
+      }
+      splitterGroups[cliente.splitter].push(cliente);
+    }
+  });
+  
+  // Calculate status for each splitter
+  const splitters = Object.keys(splitterGroups).map(splitter => {
+    const clientsInSplitter = splitterGroups[splitter];
+    const isFull = clientsInSplitter.length >= marker.totalPorts;
+    const available = marker.totalPorts - clientsInSplitter.length;
+    return {
+      name: splitter,
+      clients: clientsInSplitter.length,
+      total: marker.totalPorts,
+      available,
+      isFull
+    };
+  });
+  
+  // Determine overall status
+  const allSplittersFull = splitters.length > 0 && splitters.every(s => s.isFull);
+  const someSplittersFull = splitters.some(s => s.isFull);
+  const hasClients = splitters.length > 0;
+  
+  let status = 'empty';
+  if (allSplittersFull) status = 'full';
+  else if (someSplittersFull || hasClients) status = 'partial';
+  
+  return { status, splitters };
+};
+
+const createMarkerIcon = (status) => {
+  let iconUrl;
+  switch (status) {
+    case 'full':
+      iconUrl = 'https://static.vecteezy.com/system/resources/previews/013/760/669/non_2x/map-location-pin-icon-in-red-colors-png.png';
+      break;
+    case 'partial':
+      iconUrl = 'https://cdn-icons-png.freepik.com/512/12522/12522440.png';
+      break;
+    default:
+      iconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Map_pin_icon_green.svg/752px-Map_pin_icon_green.svg.png';
+  }
+  
   return L.icon({
-    iconUrl: isFull
-      ? 'https://static.vecteezy.com/system/resources/previews/013/760/669/non_2x/map-location-pin-icon-in-red-colors-png.png'
-      : 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Map_pin_icon_green.svg/752px-Map_pin_icon_green.svg.png',
+    iconUrl,
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
@@ -77,6 +128,9 @@ const MapComponent = () => {
     splitter: ''
   });
   const mapRef = React.useRef();
+
+  // Estado para splitters disponibles según el FAT seleccionado
+  const [availableSplitters, setAvailableSplitters] = useState([]);
 
   const location = useLocation();
   const query = new URLSearchParams(location.search);
@@ -152,6 +206,7 @@ const MapComponent = () => {
         const clientesMap = {};
         let processedRows = 0; // Contador de filas procesadas
         console.log(json);
+        // return
 
         for (const row of json) {
             const lat = row['LATITUD DEL FAT'];
@@ -415,6 +470,7 @@ const MapComponent = () => {
               description: 'Ubicación buscada',
               totalPorts: 0,
               clientes: [],
+              fat_unique: display_name.match(/\d+/)?.[0], // Extraer el número del fat_unique
               marker: newMarker // Guardar referencia del marcador
             };
           });
@@ -604,30 +660,48 @@ function haversineDistance(coords1, coords2) {
         setSelectedFatId(''); // Limpia el FAT seleccionado
     };
 
+    // Modificar handleFatChange para sugerir splitters F{N}.1 y F{N}.2 automáticamente
     const handleFatChange = (fatId) => {
-      console.log(fatId);
       const selectedFat = markers.find(fat => fat.id == fatId);
-      console.log({
-        type: 'test',
-        selectedFat
-      })
       if (selectedFat) {
-          const totalPorts = selectedFat.totalPorts; // Total de puertos
-          const occupiedPorts = selectedFat.clientes.map(cliente => cliente.port); // Puertos ocupados por clientes
-          
-          // Generar puertos disponibles
-          const allPorts = Array.from({ length: totalPorts }, (_, i) => `P${(i < 10 ? `0${i+1}` : i+1)}`)
-              .filter(port => !occupiedPorts.includes(port)); // Excluir puertos ocupados
-
-              console.log({
-                type: 'test',
-                allPorts,
-                occupiedPorts
-              })
-
-          setAvailablePorts(allPorts); // Actualizar puertos disponibles
+        // Solo splitters de este FAT
+        let splitters = [...new Set((selectedFat.clientes || []).map(cliente => cliente.splitter).filter(Boolean))];
+        // Sugerir F{N}.1 y F{N}.2 solo para este FAT usando fat_unique
+        const fatNumber = selectedFat.fat_unique.match(/\d+/)?.[0];
+        if (fatNumber) {
+          const s1 = `F${fatNumber}.1`;
+          const s2 = `F${fatNumber}.2`;
+          if (!splitters.includes(s1)) splitters.push(s1);
+          if (!splitters.includes(s2)) splitters.push(s2);
+          // Solo mostrar F{N}.1 y F{N}.2 y los que existan para este FAT
+          splitters = splitters.filter(s => s === s1 || s === s2 || (s.startsWith(`F${fatNumber}.`)));
+        }
+        setAvailableSplitters(splitters);
+        setClientForm({ ...clientForm, fat_id: fatId, splitter: '', port: '' });
+        setAvailablePorts([]);
       } else {
-          setAvailablePorts([]); // Limpiar puertos disponibles si no hay FAT seleccionado
+        setAvailableSplitters([]);
+        setAvailablePorts([]);
+        setClientForm({ ...clientForm, fat_id: fatId, splitter: '', port: '' });
+      }
+    };
+
+    // Modificar handleSplitterChange para mostrar disponibilidad de puertos
+    const handleSplitterChange = (splitter) => {
+      const selectedFat = markers.find(fat => fat.id == clientForm.fat_id);
+      if (selectedFat) {
+        // Filtrar clientes de este FAT y splitter
+        const clientesEnSplitter = (selectedFat.clientes || []).filter(cliente => cliente.splitter === splitter);
+        const totalPorts = selectedFat.totalPorts || 0;
+        const occupiedPorts = clientesEnSplitter.map(cliente => cliente.port);
+        // Generar puertos disponibles para este splitter
+        const allPorts = Array.from({ length: totalPorts }, (_, i) => `P${(i < 10 ? `0${i+1}` : i+1)}`)
+          .filter(port => !occupiedPorts.includes(port));
+        setAvailablePorts(allPorts);
+        setClientForm({ ...clientForm, splitter, port: '' }); // Limpiar puerto al cambiar splitter
+      } else {
+        setAvailablePorts([]);
+        setClientForm({ ...clientForm, splitter, port: '' });
       }
     };
 
@@ -678,50 +752,64 @@ function haversineDistance(coords1, coords2) {
                         </Select>
                     </FormControl>
                     <FormControl fullWidth required margin="normal">
-                        <InputLabel>Fats</InputLabel>
+                        <InputLabel>FAT</InputLabel>
                         <Select
                             required
                             value={clientForm.fat_id}
-                            onChange={(e) => {
-                                const selectedFatId = e.target.value;
-                                setClientForm({ ...clientForm, fat_id: selectedFatId });
-                                handleFatChange(selectedFatId); // Actualizar puertos disponibles al cambiar de FAT
-                            }}
+                            onChange={(e) => handleFatChange(e.target.value)}
                         >
-                            {markers?.map((fat) => (
-                                fat?.clientes?.length < fat.totalPorts && (
-                                    <MenuItem key={fat.id} value={fat.id}>
-                                        {fat.fat_unique} - {fat.IdFat}
-                                    </MenuItem>
-                                )
-                            ))}
+                            {markers?.map((fat) => {
+                              const status = calculateSplitterStatus(fat).status;
+                              // Show FATs that are not completely full
+                              if (status !== 'full') {
+                                return (
+                                  <MenuItem key={fat.id} value={fat.id}>
+                                    {fat.fat_unique} - {fat.IdFat} ({status === 'partial' ? 'Parcial' : 'Disponible'})
+                                  </MenuItem>
+                                );
+                              }
+                              return null;
+                            })}
                         </Select>
                     </FormControl>
 
-                    {/* Nuevo campo para seleccionar puertos disponibles */}
-                    <FormControl fullWidth required margin="normal">
+                    {/* Nuevo select para splitter */}
+                    <FormControl fullWidth required margin="normal" disabled={!clientForm.fat_id}>
+                        <InputLabel>Splitter</InputLabel>
+                        <Select
+                            required
+                            value={clientForm.splitter}
+                            onChange={(e) => handleSplitterChange(e.target.value)}
+                        >
+                            {/* Mostrar splitters sugeridos y su disponibilidad */}
+                            {availableSplitters.map(splitter => {
+                              const selectedFat = markers.find(fat => fat.id == clientForm.fat_id);
+                              const clientesEnSplitter = selectedFat ? (selectedFat.clientes || []).filter(cliente => cliente.splitter === splitter) : [];
+                              const totalPorts = selectedFat ? selectedFat.totalPorts : 0;
+                              const used = clientesEnSplitter.length;
+                              const available = totalPorts - used;
+                              return (
+                                <MenuItem key={splitter} value={splitter}>
+                                  {splitter} ({available} disponibles)
+                                </MenuItem>
+                              );
+                            })}
+                        </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth required margin="normal" disabled={!clientForm.splitter}>
                         <InputLabel>Puerto</InputLabel>
                         <Select
                             required
-                            value={clientForm.port} // Asegúrate de que `port` esté en el estado de `clientForm`
+                            value={clientForm.port}
                             onChange={(e) => setClientForm({ ...clientForm, port: e.target.value })}
                         >
                             {availablePorts.map((port) => (
-                                <MenuItem key={port} value={port}>
-                                    {port}
-                                </MenuItem>
+                                <MenuItem key={port} value={port}>{port}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>
 
-                    <TextField
-                        label="Splitter"
-                        value={clientForm.splitter}
-                        onChange={(e) => setClientForm({ ...clientForm, splitter: e.target.value })}
-                        fullWidth
-                        required
-                        margin="normal"
-                    />
                     <TextField
                         label="Dirección"
                         value={clientForm.address}
@@ -816,10 +904,12 @@ function haversineDistance(coords1, coords2) {
                             }}
                         >
                             {markers?.map((fat) => {
-                              if (fat?.clientes?.length < fat.totalPorts) {
+                              const status = calculateSplitterStatus(fat).status;
+                              // Show FATs that are not completely full
+                              if (status !== 'full') {
                                 return (
                                   <MenuItem key={fat.id} value={fat.id}>
-                                    {fat.fat_unique} - {fat.IdFat}
+                                    {fat.fat_unique} - {fat.IdFat} ({status === 'partial' ? 'Parcial' : 'Disponible'})
                                   </MenuItem>
                                 );
                               }
@@ -886,7 +976,7 @@ function haversineDistance(coords1, coords2) {
                 handleMarkerClick(marker);
               }}
             >
-              <span className={`w-[10px] h-[10px] bg-${marker?.clientes?.length >= marker.totalPorts ? 'red' : 'green'}-500 rounded-full inline-block`}></span> {console.log(marker)} {marker.fat_unique}             
+              <span className={`w-[10px] h-[10px] ${calculateSplitterStatus(marker).status === 'full' ? 'bg-red-500' : calculateSplitterStatus(marker).status === 'partial' ? 'bg-yellow-500' : 'bg-green-500'} rounded-full inline-block`}></span> {marker.fat_unique}             
             </li>
           ))}
         </ul>
@@ -901,7 +991,7 @@ function haversineDistance(coords1, coords2) {
             <Marker
               key={`marker-map-${index}`}
               position={{ lat: marker.lat, lng: marker.lng }}
-              icon={createMarkerIcon(marker?.clientes?.length >= marker.totalPorts)}
+              icon={createMarkerIcon(calculateSplitterStatus(marker).status)}
               eventHandlers={{
                 click: () => handleMarkerClick(marker),
               }}
@@ -918,8 +1008,22 @@ function haversineDistance(coords1, coords2) {
                             <li className='mt-2'><strong>Nombre FAT:</strong> {marker.IdFat}</li>
                             <li><strong>Puertos:</strong> {marker.totalPorts}</li>
                             <li><strong>Puertos en uso:</strong> {marker?.clientes?.length > 0 ? marker?.clientes?.length : 0}</li>
-                            <li><strong>Estado:</strong> <span className={`text-xs uppercase rounded-full w-3 h-3 inline-flex -mb-[1px] mr-[2px] ${marker?.clientes?.length >= marker.totalPorts ? 'bg-red-500' : 'bg-green-500'}`}></span><strong>{marker?.clientes?.length >= marker.totalPorts ? 'Completo' : 'Disponible'}</strong></li>
+                            <li><strong>Estado:</strong> <span className={`text-xs uppercase rounded-full w-3 h-3 inline-flex -mb-[1px] mr-[2px] ${calculateSplitterStatus(marker).status === 'full' ? 'bg-red-500' : calculateSplitterStatus(marker).status === 'partial' ? 'bg-yellow-500' : 'bg-green-500'}`}></span><strong>{calculateSplitterStatus(marker).status === 'full' ? 'Completo' : calculateSplitterStatus(marker).status === 'partial' ? 'Parcial' : 'Disponible'}</strong></li>
                         </ul>
+                        {calculateSplitterStatus(marker).splitters.length > 0 && (
+                          <>
+                            <h5 className='font-bold mt-3'>Estado de Splitters:</h5>
+                            <ul className='pl-5 list-disc mb-2 min-w-[281px]'>
+                              {calculateSplitterStatus(marker).splitters.map(splitter => (
+                                <li key={splitter.name} className='flex items-center gap-2'>
+                                  <span className={`text-xs uppercase rounded-full w-3 h-3 inline-flex ${splitter.isFull ? 'bg-red-500' : 'bg-green-500'}`}></span>
+                                  <strong>{splitter.name}:</strong> {splitter.clients}/{splitter.total} puertos ({splitter.available} disponibles)
+                                  {splitter.isFull && <span className='text-red-600 font-bold text-xs'>COMPLETO</span>}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
                         <h5 className='font-bold'>Clientes:</h5>
                         <ul className=''>
                             {marker?.clientes?.length > 0 ? (
@@ -941,6 +1045,11 @@ function haversineDistance(coords1, coords2) {
                                          className='cursor-pointer text-xl absolute top-0 right-[22px] rounded-bl-lg p-1 bg-white text-blue-500 transition-all hover:bg-blue-500 hover:text-white'
                                          onClick={() => {
                                             setSelectedClient({...cliente, fat: marker.IdFat});
+                                            // Limpiar campos del formulario al abrir el modal
+                                            setSelectedFat('');
+                                            setClientForm({ ...clientForm, fat_id: '', splitter: '', port: '' });
+                                            setAvailableSplitters([]);
+                                            setAvailablePorts([]);
                                             setIsModalOpen(true);
                                         }} color="primary" variant='contained'>⇆</button>
                                         <button
@@ -965,33 +1074,65 @@ function haversineDistance(coords1, coords2) {
               <h1 className='font-bold text-xl mb-1'>{selectedClient?.fat}</h1>
               <p className='mb-1'>¿A qué FAT deseas transferir a <strong className='uppercase'>{selectedClient?.nombreApellido}</strong>?</p>
               {/* aquivale */}
-              <Select
-                fullWidth
-                required
-                value={selectedFat} // Asegúrate de que `fat` esté en el estado de `clientForm`
-                
-                onChange={(e) => {
-                  const selectedFatId = e.target.value;
-                  setSelectedFat(e.target.value)
-                  handleFatChange(selectedFatId); // Actualizar puertos disponibles al cambiar de FAT
-                }}
-              >
-                {markers?.map((fat) => {
-                  if (fat?.clientes?.length < fat.totalPorts) {
-                    return (
-                      <MenuItem key={fat.id} value={fat.id}>
-                        {fat.IdFat}
-                      </MenuItem>
-                    );
-                  }
-                  return null;
-                })}
-              </Select>
               <FormControl fullWidth required margin="normal">
+                  <InputLabel>FAT</InputLabel>
+                  <Select
+                    fullWidth
+                    required
+                    value={selectedFat}
+                    onChange={(e) => {
+                      const selectedFatId = e.target.value;
+                      setSelectedFat(e.target.value);
+                      // Limpiar splitter y puerto al cambiar de FAT
+                      setClientForm({ ...clientForm, fat_id: selectedFatId, splitter: '', port: '' });
+                      setAvailableSplitters([]);
+                      setAvailablePorts([]);
+                      // Actualizar splitters disponibles para el nuevo FAT
+                      handleFatChange(selectedFatId);
+                    }}
+                  >
+                    {markers?.map((fat) => {
+                      const status = calculateSplitterStatus(fat).status;
+                      // Show FATs that are not completely full
+                      if (status !== 'full') {
+                        return (
+                          <MenuItem key={fat.id} value={fat.id}>
+                            {fat.IdFat} ({status === 'partial' ? 'Parcial' : 'Disponible'})
+                          </MenuItem>
+                        );
+                      }
+                      return null;
+                    })}
+                  </Select>
+              </FormControl>
+              
+              <FormControl fullWidth required margin="normal" disabled={!selectedFat}>
+                  <InputLabel>Splitter</InputLabel>
+                  <Select
+                      required
+                      value={clientForm.splitter}
+                      onChange={(e) => handleSplitterChange(e.target.value)}
+                  >
+                      {availableSplitters.map(splitter => {
+                        const selectedFatData = markers.find(fat => fat.id == selectedFat);
+                        const clientesEnSplitter = selectedFatData ? (selectedFatData.clientes || []).filter(cliente => cliente.splitter === splitter) : [];
+                        const totalPorts = selectedFatData ? selectedFatData.totalPorts : 0;
+                        const used = clientesEnSplitter.length;
+                        const available = totalPorts - used;
+                        return (
+                          <MenuItem key={splitter} value={splitter}>
+                            {splitter} ({available} disponibles)
+                          </MenuItem>
+                        );
+                      })}
+                  </Select>
+              </FormControl>
+              
+              <FormControl fullWidth required margin="normal" disabled={!clientForm.splitter}>
                   <InputLabel>Puerto</InputLabel>
                   <Select
                       required
-                      value={clientForm.port} // Asegúrate de que `port` esté en el estado de `clientForm`
+                      value={clientForm.port}
                       onChange={(e) => setClientForm({ ...clientForm, port: e.target.value })}
                   >
                       {availablePorts.map((port) => (
@@ -1005,8 +1146,24 @@ function haversineDistance(coords1, coords2) {
 
           </DialogContent>
           <DialogActions>
-              <Button onClick={() => setIsModalOpen(false)} color="primary">Cancelar</Button>
-              <Button onClick={() => { clientForm?.port ? setIsConfirmOpen(true) : toast.error('Debe elegir un puerto')}} color="primary">Transferir</Button>
+              <Button onClick={() => {
+                setIsModalOpen(false);
+                // Limpiar campos al cerrar el modal
+                setSelectedFat('');
+                setClientForm({ ...clientForm, fat_id: '', splitter: '', port: '' });
+                setAvailableSplitters([]);
+                setAvailablePorts([]);
+                setSelectedClient(null);
+              }} color="primary">Cancelar</Button>
+              <Button onClick={() => { 
+                if (!clientForm?.splitter) {
+                  toast.error('Debe elegir un splitter');
+                } else if (!clientForm?.port) {
+                  toast.error('Debe elegir un puerto');
+                } else {
+                  setIsConfirmOpen(true);
+                }
+              }} color="primary">Transferir</Button>
           </DialogActions>
         </Dialog>
         <Dialog open={isConfirmOpen} onClose={() => setIsConfirmOpen(false)}>
@@ -1016,7 +1173,7 @@ function haversineDistance(coords1, coords2) {
                   marker: markers,
                   selectedFat,
                 })}
-              <p>¿Está seguro de que desea transferir a <strong className='uppercase'>{selectedClient?.nombreApellido}</strong> al puerto <strong className='uppercase'>{clientForm?.port}</strong> en el <strong className='uppercase'>{markers?.filter(x => x?.id == selectedFat)[0]?.fat_unique} - {markers?.filter(x => x?.id == selectedFat)[0]?.IdFat}</strong>?</p>
+              <p>¿Está seguro de que desea transferir a <strong className='uppercase'>{selectedClient?.nombreApellido}</strong> al splitter <strong className='uppercase'>{clientForm?.splitter}</strong> puerto <strong className='uppercase'>{clientForm?.port}</strong> en el <strong className='uppercase'>{markers?.filter(x => x?.id == selectedFat)[0]?.fat_unique} - {markers?.filter(x => x?.id == selectedFat)[0]?.IdFat}</strong>?</p>
           </DialogContent>
           <DialogActions>
               <Button onClick={() => setIsConfirmOpen(false)} color="primary">Cancelar</Button>
@@ -1026,7 +1183,7 @@ function haversineDistance(coords1, coords2) {
                       const fatName = markers?.filter(x => x?.id == selectedFat)[0]?.IdFat;
                       const { data, error } = await supabase
                           .from('clientes')
-                          .update({ fat_id: selectedFat, port: clientForm?.port }) // Actualiza el fat_id del cliente
+                          .update({ fat_id: selectedFat, splitter: clientForm?.splitter, port: clientForm?.port }) // Actualiza fat_id, splitter y puerto del cliente
                           .eq('id', selectedClient.id); // Filtra por el id del cliente
 
                       if (error) {
@@ -1036,7 +1193,10 @@ function haversineDistance(coords1, coords2) {
                           await fetchMarkers();
                           console.log(`Cliente ${selectedClient?.nombreApellido} transferido a FAT ${fatName}`);
                           toast.success(`Cliente ${selectedClient?.nombreApellido} transferido a FAT ${fatName}`);
-                          setClientForm({ id: '', name: '', userType: '', address: '', dni: '' });
+                          setClientForm({ id: '', name: '', userType: '', address: '', dni: '', fat_id: '', splitter: '', port: '' });
+                          setSelectedFat('');
+                          setAvailableSplitters([]);
+                          setAvailablePorts([]);
                           // Aquí puedes agregar lógica adicional si es necesario
                       }
                   } catch (error) {
